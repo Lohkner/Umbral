@@ -1,6 +1,6 @@
 /* Service worker: la app entera queda en caché y funciona sin conexión.
-   Al cambiar cualquier archivo, sube CACHE_VERSION. */
-const CACHE_VERSION = 'armisticio-v1';
+   Al añadir o quitar archivos de APP_SHELL, sube CACHE_VERSION. */
+const CACHE_VERSION = 'armisticio-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -34,14 +34,13 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
-/* Primero la caché; si no está, la red (y se guarda para la próxima). */
+/* Primero la red: con conexión siempre se carga lo último y se refresca
+   la copia; sin conexión se sirve la copia guardada. */
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request).then(res => {
-    if (res.ok && new URL(e.request.url).origin === location.origin) {
-      const copia = res.clone();
-      caches.open(CACHE_VERSION).then(c => c.put(e.request, copia));
-    }
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  e.respondWith(fetch(e.request).then(res => {
+    if (res.ok) { const copia = res.clone(); caches.open(CACHE_VERSION).then(c => c.put(e.request, copia)); }
     return res;
-  }).catch(() => caches.match('./index.html'))));
+  }).catch(() => caches.match(e.request, { ignoreSearch: true })
+    .then(r => r || (e.request.mode === 'navigate' ? caches.match('./index.html') : undefined))));
 });
