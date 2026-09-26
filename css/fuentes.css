@@ -1,0 +1,16 @@
+/* Letras instaladas en la propia app (SIL Open Font License): la app
+   funciona sin conexión y no pide nada a servidores externos.
+   · IM Fell English SC — títulos (grabado antiguo, versalitas)
+   · EB Garamond        — texto
+   · Cinzel             — cifras y numerales romanos del Rango
+   · JetBrains Mono     — dados y fórmulas
+   «Arm Título» es IM Fell SC con las cifras de Cinzel: las cifras de Fell
+   en versalitas se leen como signos sueltos (un 2 parece «°»). */
+@font-face{font-family:'IM Fell English SC';font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/im-fell-english-sc-400.woff2) format('woff2')}
+@font-face{font-family:'EB Garamond';font-style:normal;font-weight:400 800;font-display:swap;src:url(../fonts/eb-garamond-var.woff2) format('woff2')}
+@font-face{font-family:'EB Garamond';font-style:italic;font-weight:400 800;font-display:swap;src:url(../fonts/eb-garamond-var-italic.woff2) format('woff2')}
+@font-face{font-family:'Cinzel';font-style:normal;font-weight:400 900;font-display:swap;src:url(../fonts/cinzel-var.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url(../fonts/jetbrains-mono-var.woff2) format('woff2')}
+
+@font-face{font-family:'Arm Titulo';font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/im-fell-english-sc-400.woff2) format('woff2')}
+@font-face{font-family:'Arm Titulo';font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/cinzel-var.woff2) format('woff2');unicode-range:U+0030-0039}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0807">
+<meta name="description" content="Ficha de personaje para Armisticio, juego de rol de fantasía oscura.">
+<title>Armisticio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icono-apple-180.png">
+<link rel="preload" href="fonts/im-fell-english-sc-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/eb-garamond-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fuentes.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-atras" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-ajustes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></symbol>
+    <symbol id="i-persona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.2 4.4-6 8-6s6.5 1.8 8 6"/></symbol>
+    <symbol id="i-espada" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4v4.5L10.5 18l-4.5-4.5L15.5 4z"/><path d="M4.5 12l7.5 7.5"/><path d="M7 17l-3 3"/></symbol>
+    <symbol id="i-mochila" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M9 5.5V4a3 3 0 0 1 6 0v1.5M9 14h6v3H9z"/></symbol>
+    <symbol id="i-diario" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5h11a2 2 0 0 1 2 2v15H7a2 2 0 0 1-2-2z"/><path d="M5 18.5a2 2 0 0 1 2-2h11M9 8h6M9 11h4"/></symbol>
+    <symbol id="i-d20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l8.5 5v9L12 21.5l-8.5-5v-9z"/><path d="M12 2.5L7.6 10h8.8zM3.5 7.5L7.6 10 12 21.5 16.4 10l4.1-2.5M7.6 10l-4.1 6.5M16.4 10l4.1 6.5"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-menos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
+    <symbol id="i-lapiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="M14.5 6.5l3 3"/></symbol>
+    <symbol id="i-basura" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></symbol>
+    <symbol id="i-flecha-arriba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-cerrar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-corazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/></symbol>
+    <symbol id="i-anillo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="12" cy="14.5" r="6"/><path d="M9.5 6.5L12 3l2.5 3.5L12 8.5z"/></symbol>
+    <symbol id="i-amuleto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3c1.5 4 4 6 7 6s5.5-2 7-6"/><path d="M12 11l4 4.5-4 5.5-4-5.5z"/></symbol>
+    <symbol id="i-armadura" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 3.5l4 2 4-2 4.5 3-2 4.5-1.5-1V20.5h-10V10L5.5 11l-2-4.5z"/></symbol>
+    <symbol id="i-copia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></symbol>
+    <symbol id="i-subir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 21V9M7 14l5-5 5 5"/><path d="M4 3.5h16"/></symbol>
+  </defs>
+</svg>
+
+<header class="barra" id="barra">
+  <button class="barra-btn" id="btn_atras" aria-label="Volver a los personajes" hidden><svg class="ico"><use href="#i-atras"/></svg></button>
+  <div class="barra-titulo">
+    <span class="barra-nombre" id="barra_nombre">Armisticio</span>
+    <span class="barra-sub" id="barra_sub">Ficha de personaje</span>
+  </div>
+  <button class="barra-btn" id="btn_ajustes" aria-label="Ajustes"><svg class="ico"><use href="#i-ajustes"/></svg></button>
+</header>
+
+<main id="main">
+  <section class="pantalla" id="pantalla_inicio"></section>
+  <section class="pantalla" id="pantalla_ficha" hidden>
+    <div class="pagina" id="pag_personaje"></div>
+    <div class="pagina" id="pag_combate" hidden></div>
+    <div class="pagina" id="pag_equipo" hidden></div>
+    <div class="pagina" id="pag_diario" hidden></div>
+  </section>
+</main>
+
+<nav class="pestanas" id="pestanas" hidden aria-label="Secciones de la ficha">
+  <button class="pest activa" data-pag="personaje"><svg class="ico"><use href="#i-persona"/></svg><span>Personaje</span></button>
+  <button class="pest" data-pag="combate"><svg class="ico"><use href="#i-espada"/></svg><span>Combate</span></button>
+  <button class="pest" data-pag="equipo"><svg class="ico"><use href="#i-mochila"/></svg><span>Equipo</span></button>
+  <button class="pest" data-pag="diario"><svg class="ico"><use href="#i-diario"/></svg><span>Diario</span></button>
+</nav>
+
+<!-- Resultado de una tirada -->
+<div class="velo" id="velo_tirada" hidden>
+  <div class="tirada" id="tirada" role="dialog" aria-modal="true" aria-labelledby="tirada_titulo"></div>
+</div>
+
+<!-- Diálogo genérico: asistente, objetos, subida de nivel, ajustes… -->
+<div class="velo" id="velo_dlg" hidden>
+  <div class="dlg" id="dlg" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="avisos" id="avisos" role="status" aria-live="polite"></div>
+
+<script src="js/reglas.js"></script>
+<script src="js/motor.js"></script>
+<script src="js/almacen.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
