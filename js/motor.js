@@ -113,7 +113,7 @@ const Motor = (() => {
     const armadura = eq.armadura || null;
     const armData = armadura ? ARMADURAS.find(a => a.id === armadura.sub) || ARMADURAS[0] : ARMADURAS[0];
 
-    // Guardia: 10 + Competencia + DES (VIT con Aguante) + escudo + otros
+    // Guardia (defensa pasiva): 10 + DES (VIT con Aguante) + Competencia + escudo + otros
     const aguante = pj.clase === 'guerrero';
     const atrDef = aguante ? 'VIT' : 'DES';
     let guardiaOtros = 0;
@@ -136,12 +136,12 @@ const Motor = (() => {
     const pvNiveles = (pj.pvNiveles || []).reduce((a, b) => a + (+b || 0), 0);
     const pvMax = Math.max(1, cl.pv + pvNiveles + pvObjetos + (+pj.pvExtra || 0));
 
-    // Ataque
+    // Combate: lo que se suma para atacar (y, el cuerpo a cuerpo, para bloquear)
     const ataque = { cac: mods.FUE + comp, dist: mods.DES + comp, magia: mods.MEN + comp };
     const tipoArma = arma?.sub || 'cac';
     const ataquePrincipal = tipoArma === 'dist' ? 'dist' : tipoArma === 'foco' ? 'magia' : 'cac';
 
-    // Bloqueo: FUE + Competencia, +2 con escudo; necesita escudo o arma CaC
+    // Bloquear: Combate cuerpo a cuerpo, +2 con escudo; necesita escudo o arma CaC
     const puedeBloquear = !!escudo || (arma && (arma.sub === 'cac' || arma.sub === 'dos'));
     const bloqueo = puedeBloquear ? mods.FUE + comp + (escData ? escData.bloqueo : 0) : null;
 
@@ -190,7 +190,7 @@ const Motor = (() => {
     const consRanuras = {};
     Object.entries(CONSUMIBLES).forEach(([k, c]) => {
       const n = +cons[k] || 0;
-      consRanuras[k] = n > 0 ? Math.ceil(n / c.porRanura) : 0;
+      consRanuras[k] = n > 0 && c.porRanura ? Math.ceil(n / c.porRanura) : 0;
       ranurasUsadas += consRanuras[k];
     });
     Object.keys(DADOS_USO).forEach(k => { if (pj.usos && pj.usos[k] != null && pj.usos[k] >= 0) ranurasUsadas += 1; });
@@ -202,6 +202,7 @@ const Motor = (() => {
     if (armData.tipo && !cl.armadura.includes(armData.tipo))
       avisos.push(`${cl.nombre}: no puede llevar armadura ${armData.tipo}.`);
     if (escudo && !cl.escudo) avisos.push(`${cl.nombre}: no puede llevar escudo.`);
+    else if (escudo && !(cl.escudos || []).includes(escudo.sub)) avisos.push(`${cl.nombre}: solo puede llevar escudo estándar.`);
     if (armBruta > armMax) avisos.push(`Tu Armadura sería ${armBruta}, pero el máximo es ${armMax} (5 + Competencia): se pierde el resto.`);
     if (ranurasUsadas > ranurasMax) avisos.push(`Llevas ${ranurasUsadas} ranuras y solo tienes ${ranurasMax}: lo que no cabe se deja atrás.`);
     RANURAS.forEach(r => {
@@ -215,7 +216,7 @@ const Motor = (() => {
 
     return {
       cl, nivel, comp, rango, atr, mods, bonus, fuentesAtr,
-      ataque, ataquePrincipal, guardia, guardiaDesprevenido, defensa: guardia - 10, atrDef,
+      ataque, ataquePrincipal, guardia, guardiaDesprevenido, atrDef,
       armadura: armaduraRD, armaduraBruta: armBruta, armaduraMax: armMax, armData,
       bloqueo, pvMax, dado, dadoBase, escArma,
       rangoArma: arma?.rango || 1, rangoArmadura: armadura?.rango || 1,

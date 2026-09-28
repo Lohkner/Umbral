@@ -69,12 +69,12 @@ const Almacen = (() => {
   }
 
   function exportar() {
-    const datos = { tipo: 'armisticio-respaldo', version: VERSION_FICHA, fecha: new Date().toISOString(), personajes: lista() };
+    const datos = { tipo: 'umbral-respaldo', version: VERSION_FICHA, fecha: new Date().toISOString(), personajes: lista() };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     const f = new Date().toISOString().slice(0, 10);
     a.href = URL.createObjectURL(blob);
-    a.download = `armisticio-respaldo-${f}.json`;
+    a.download = `umbral-respaldo-${f}.json`;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     return datos.personajes.length;
@@ -83,9 +83,10 @@ const Almacen = (() => {
   /* Acepta una copia completa o una ficha suelta. Devuelve cuántas entraron. */
   function importar(texto) {
     const datos = JSON.parse(texto);
-    const fichas = datos && datos.tipo === 'armisticio-respaldo' ? datos.personajes
+    // Acepta también las copias hechas antes de llamarse Umbral
+    const fichas = datos && (datos.tipo === 'umbral-respaldo' || datos.tipo === 'armisticio-respaldo') ? datos.personajes
       : datos && datos.clase && datos.base ? [datos] : null;
-    if (!fichas) throw new Error('El archivo no es una ficha ni una copia de Armisticio.');
+    if (!fichas) throw new Error('El archivo no es una ficha ni una copia de Umbral.');
     const t = leerTodo();
     fichas.forEach(f => {
       const pj = normalizar(f);

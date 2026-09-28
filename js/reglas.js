@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Reglas de Armisticio — Manual de Prueba v0.1.
+   Reglas de Armisticio — Manual Oficial v1.0.
    Solo datos: tablas del manual tal cual, sin lógica. El cálculo vive
    en motor.js. Si el manual cambia, casi todo se toca aquí.
 ══════════════════════════════════════════════════════════════ */
@@ -56,48 +56,48 @@ const RAZAS = {
 const CLASES = {
   guerrero: {
     nombre: 'Guerrero', principal: 'FUE', pv: 10, vida: 'd10', dado: 2,
-    armadura: ['ligera', 'media', 'pesada'], escudo: true,
-    recurso: { nombre: 'Furia', sube: true, inicio: 0, max: 4,
-      regla: 'Empieza cada combate en d4 y sube un escalón cada vez que recibes daño (hasta d12).' },
+    armadura: ['ligera', 'media', 'pesada'], escudo: true, escudos: ['estandar', 'torre'],
+    recurso: { nombre: 'Furia', sube: true, inicio: 0, min: 0, max: 4,
+      regla: 'Empieza cada combate en d4 y sube un escalón cada vez que recibes daño (hasta d12). Gastar Furia la baja un escalón; en d4 no se puede gastar.' },
     resumen: 'En primera línea: aguanta golpes y los devuelve. Sencillo y directo.',
     habilidades: [
-      ['Aguante', 'Tu Guardia y tu Defensa usan tu modificador de Vitalidad en lugar del de Destreza.'],
+      ['Aguante', 'Tu Guardia usa tu modificador de Vitalidad en lugar del de Destreza.'],
       ['Furia', 'Empieza cada combate en d4 y sube un escalón cada vez que recibes daño (hasta d12).'],
-      ['Golpe Brutal', 'Cuando impactas, suma tu dado de Furia al daño; después la Furia baja un escalón.'],
+      ['Golpe Brutal', 'Cuando tu ataque hace daño, suma tu dado de Furia; después la Furia baja un escalón.'],
     ],
   },
   picaro: {
     nombre: 'Pícaro', principal: 'DES', pv: 8, vida: 'd6', dado: 1,
-    armadura: ['ligera'], escudo: false,
-    recurso: { nombre: 'Combo', sube: true, inicio: -1, max: 4,
-      regla: 'Cada ataque que aciertas lo sube un escalón. Empieza vacío: el primer acierto te da d4.' },
+    armadura: ['ligera'], escudo: false, escudos: [],
+    recurso: { nombre: 'Combo', sube: true, inicio: -1, min: -1, max: 4,
+      regla: 'Cada ataque tuyo que hace daño lo sube un escalón. Empieza vacío: el primero te da d4. Gastar el Combo lo vacía.' },
     resumen: 'Ágil y sigiloso: golpea donde duele o dispara desde lejos.',
     habilidades: [
-      ['Combo', 'Cada ataque que aciertas lo sube un escalón. Empieza vacío: el primer acierto te da d4.'],
+      ['Combo', 'Cada ataque tuyo que hace daño lo sube un escalón. Empieza vacío: el primero te da d4.'],
       ['Eviscerar', 'Suma tu dado de Combo al daño y lo vacía.'],
       ['Emboscada', 'Si atacas sin que te hayan visto, haces el daño máximo del dado, sin tirarlo.'],
     ],
   },
   mago: {
     nombre: 'Mago', principal: 'MEN', pv: 6, vida: 'd4', dado: 1,
-    armadura: [], escudo: false,
-    recurso: { nombre: 'Maná', sube: false, inicio: 2, max: 4,
-      regla: 'Empieza en d8. Al usar un poder que cuesta Maná, tira el dado: con 1 o 2 baja un escalón. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
+    armadura: [], escudo: false, escudos: [],
+    recurso: { nombre: 'Maná', sube: false, inicio: 2, min: -1, max: 4,
+      regla: 'Empieza en d8. Al usar un poder que cuesta Maná, tira el dado: con 1 o 2 baja un escalón; en d4, se agota hasta que descanses. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
     resumen: 'Hechizos devastadores, pero frágil. Pensar antes de actuar.',
     habilidades: [
-      ['Descarga', 'Ataque mágico a distancia (Lejos): 1d20 + Ataque mágico contra la Guardia del objetivo. No gasta Maná.'],
-      ['Nova de Escarcha', 'Cuesta Maná. Todos los enemigos Cerca: una tirada de Ataque mágico contra la Guardia más alta. Si impacta, todos reciben tu daño y quedan congelados un turno; si no, la mitad.'],
+      ['Descarga', 'Ataque mágico a distancia (Lejos): tirada de combate mágica contra la Guardia del objetivo. No gasta Maná.'],
+      ['Nova de Escarcha', 'Cuesta Maná. Todos los enemigos Cerca: una tirada de combate mágica contra la Guardia más alta. Si la supera, todos reciben tu daño y quedan congelados un turno; si no, la mitad. No se puede bloquear.'],
     ],
   },
   clerigo: {
     nombre: 'Clérigo', principal: 'MEN', pv: 8, vida: 'd8', dado: 1,
-    armadura: ['ligera', 'media'], escudo: true,
-    recurso: { nombre: 'Fe', sube: false, inicio: 2, max: 4,
-      regla: 'Empieza en d8. Al usar un poder que cuesta Fe, tira el dado: con 1 o 2 baja un escalón. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
+    armadura: ['ligera', 'media'], escudo: true, escudos: ['estandar'],
+    recurso: { nombre: 'Fe', sube: false, inicio: 2, min: -1, max: 4,
+      regla: 'Empieza en d8. Al usar un poder que cuesta Fe, tira el dado: con 1 o 2 baja un escalón; en d4, se agota hasta que descanses. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
     resumen: 'Cura a sus compañeros y castiga a los muertos.',
     habilidades: [
       ['Sanar', 'Cuesta Fe. Un aliado Próximo recupera tu dado de clase en PV, más los escalones de tu símbolo sagrado.'],
-      ['Luz Sagrada', 'Ataque mágico (1d20 + Ataque mágico contra la Guardia); ventaja contra muertos vivientes y demonios.'],
+      ['Luz Sagrada', 'Ataque con tu Combate mágico contra la Guardia del objetivo; ventaja contra muertos vivientes y demonios.'],
     ],
   },
 };
@@ -114,7 +114,7 @@ const ESTILOS = {
     { estilo: 'Baluarte', nota: 'arma y escudo', hab: [
       ['muro_escudos', 'Muro de escudos', 'Un aliado Cerca suma tu Armadura a la suya este turno (sin pasar de su máximo).'],
       ['provocacion', 'Provocación', 'Gasta Furia; hasta tu próximo turno, los enemigos Cerca solo pueden atacarte a ti.'],
-      ['represalia', 'Represalia', 'Cuando evitas o bloqueas un ataque llevando escudo, el atacante recibe tu dado de Furia en daño.'],
+      ['represalia', 'Represalia', 'Cuando bloqueas un ataque con escudo, el atacante recibe tu dado de Furia en daño.'],
     ] },
     { estilo: 'Comunes', hab: [
       ['carga', 'Carga', 'Te mueves hasta Próximo y atacas con ventaja.'],
@@ -144,7 +144,7 @@ const ESTILOS = {
       ['muro_llamas', 'Muro de llamas', 'Cuesta Maná; una línea de fuego Próxima quema con tu dado de clase a quien la cruce, durante 3 turnos.'],
     ] },
     { estilo: 'Arcanista', nota: 'control', hab: [
-      ['polimorfia', 'Polimorfia', 'Cuesta Maná; un enemigo con DG iguales o menores que tu nivel se convierte en oveja durante 3 turnos.'],
+      ['polimorfia', 'Polimorfia', 'Cuesta Maná; un enemigo con DG iguales o menores que tu nivel (o un personaje de nivel igual o menor) se convierte en oveja durante 3 turnos.'],
       ['parpadeo', 'Parpadeo', 'Te teletransportas hasta Próximo.'],
       ['contrahechizo', 'Contrahechizo', 'Cuesta Maná; un monstruo pierde su poder especial hasta el final del turno.'],
     ] },
@@ -160,7 +160,7 @@ const ESTILOS = {
       ['intercesion', 'Intercesión', 'Una vez por sesión, un aliado caído repite su tirada de Fuera de Combate.'],
     ] },
     { estilo: 'Juicio', nota: 'combate', hab: [
-      ['martillo', 'Martillo sagrado', 'Cuando impactas cuerpo a cuerpo, gasta Fe y suma su dado al daño.'],
+      ['martillo', 'Martillo sagrado', 'Cuando tu ataque cuerpo a cuerpo hace daño, gasta Fe y suma su dado al daño.'],
       ['expulsar', 'Expulsar', 'Los muertos vivientes con DG iguales o menores que tu nivel huyen.'],
       ['marca', 'Marca del juicio', 'Cuesta Fe; tus aliados atacan con ventaja al enemigo marcado hasta que caiga.'],
     ] },
@@ -247,12 +247,12 @@ const PROPIEDADES = [
   { id: 'atributo', nombre: '+1 a un atributo', txt: '+1 a un atributo (máximo 18).', elige: 'atr' },
   { id: 'pv', nombre: '+2 PV máximos', txt: '+2 PV máximos.' },
   { id: 'resistencia', nombre: 'Resistencia', txt: 'Ventaja en las salvaciones contra fuego, frío, veneno o mente.', elige: 'res' },
-  { id: 'robo', nombre: 'Robo de vida', txt: 'Recuperas 1 PV cada vez que impactas.' },
+  { id: 'robo', nombre: 'Robo de vida', txt: 'Recuperas 1 PV cada vez que tu ataque hace daño.' },
   { id: 'critico', nombre: 'Crítico ampliado', txt: 'Sacas crítico con 19 o 20 natural.' },
   { id: 'engaste', nombre: 'Engaste', txt: 'Tiene un hueco para poner una gema.' },
   { id: 'recurso', nombre: 'Recurso ampliado', txt: 'Tu recurso de clase empieza un escalón más alto.' },
   { id: 'hallazgo', nombre: 'Hallazgo', txt: '+1 a tus tiradas de rareza.' },
-  { id: 'espinas', nombre: 'Espinas', txt: 'Quien te impacta desde Cerca recibe 1 de daño.' },
+  { id: 'espinas', nombre: 'Espinas', txt: 'Quien te hace daño desde Cerca recibe 1 de daño.' },
   { id: 'agil', nombre: 'Ágil', txt: 'Ventaja al tirar quién actúa primero.' },
 ];
 const RESISTENCIAS = { fuego: 'Fuego', frio: 'Frío', veneno: 'Veneno', mente: 'Mente' };
@@ -261,7 +261,7 @@ const RESISTENCIAS = { fuego: 'Fuego', frio: 'Frío', veneno: 'Veneno', mente: '
 const GEMAS = {
   rubi:     { nombre: 'Rubí', arma: '+1 escalón de daño', armadura: '+2 PV máximos', joya: '+1 Fuerza' },
   zafiro:   { nombre: 'Zafiro', arma: 'Con un crítico, congelas al enemigo un turno', armadura: 'Armadura: +1 Armadura · Escudo: +1 Guardia', joya: 'Resistencia al frío' },
-  calavera: { nombre: 'Calavera', arma: 'Recuperas 1 PV cada vez que impactas', armadura: 'Recuperas 1 PV al inicio de tu turno', joya: '+1 Vitalidad' },
+  calavera: { nombre: 'Calavera', arma: 'Recuperas 1 PV cada vez que tu ataque hace daño', armadura: 'Recuperas 1 PV al inicio de tu turno', joya: '+1 Vitalidad' },
   topacio:  { nombre: 'Topacio', arma: 'Tiras dos veces la rareza del botín de un jefe', armadura: '+1 a tus tiradas de hallazgo', joya: '+1 Mente' },
 };
 
@@ -269,7 +269,9 @@ const GEMAS = {
 const CONSUMIBLES = {
   raciones: { nombre: 'Raciones', porRanura: 3, txt: 'Cada personaje come una al acampar.' },
   flechas:  { nombre: 'Flechas', porRanura: 20, txt: 'Una por disparo; tras el combate recuperas la mitad de las disparadas.' },
-  pociones: { nombre: 'Pociones', porRanura: 2, txt: 'Una por uso. Curan d6 (Rango I) o d8 (Rango II).' },
+  pociones: { nombre: 'Pociones', porRanura: 2, txt: 'Una por uso. Curan según su Rango.' },
+  /* El manual v1.0 no dice cuánto ocupan: la app no les cuenta ranuras */
+  veneno:   { nombre: 'Dosis de veneno', porRanura: null, txt: 'Para la habilidad Veneno del pícaro; el alquimista las fabrica.' },
   portal:   { nombre: 'Pergaminos de Portal', porRanura: 1, txt: 'Abre una puerta mágica de vuelta a la ciudad.' },
 };
 /* Curación de pociones por Rango (cap. 6 y 10) */

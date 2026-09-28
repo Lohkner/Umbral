@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Armisticio Companion — interfaz.
+   Umbral — ficha de personaje para Armisticio (Manual Oficial v1.0).
    La ficha se pinta entera desde el estado (App.pj) y cada cambio se
    guarda al momento. Los botones llevan data-acc="acción" y un único
    escuchador los reparte (ACC); los campos, data-campo.
@@ -12,13 +12,7 @@ const ico = (id, cls = 'ico') => `<svg class="${cls}" aria-hidden="true"><use hr
 const S = Motor.signo;
 const R = n => ROMANO[n] || '—';
 
-const App = {
-  pj: null,
-  pag: 'personaje',
-  rival: { rango: 0, cd: '' },   // contra quién se tira (se conserva mientras dura la sesión)
-  vent: 0,                        // ventaja manual para la próxima tirada
-  orcoUsado: false,
-};
+const App = { pj: null, pag: 'ficha' };
 
 /* ── Utilidades de interfaz ─────────────────────────────────── */
 function aviso(txt, tipo) {
@@ -82,91 +76,109 @@ function pedirNumero(titulo, valor, fn, { operaciones = false, min = 0 } = {}) {
 
 /* ══════════════════════════════════════════════════════════════
    TIRADAS
+   Se toca una casilla y se tira. La ventaja o desventaja (por Rango o
+   por circunstancias) se decide después: el resultado ofrece repetir la
+   tirada con dos dados. Nada que configurar antes.
 ══════════════════════════════════════════════════════════════ */
-function ventajaTotal(fuentes) {
-  const hay = v => fuentes.some(f => f === v);
-  const a = hay(1), dv = hay(-1);
-  return a && dv ? 0 : a ? 1 : dv ? -1 : 0;
-}
-
-/* opts: { titulo, mod, etiquetaMod, rangoMio, cd, critMin, extraVent, notas[], alExito, alFallo, tipo } */
-function tirarD20(opts) {
-  const r = App.rival;
-  const rango = opts.rangoMio != null ? Motor.porRango(opts.rangoMio, r.rango) : { ventaja: 0, extra: null, texto: '' };
-  const fuentes = [App.vent, rango.ventaja, opts.extraVent || 0];
-  const v = ventajaTotal(fuentes);
+function tirar(cfg, v = 0) {
   const t = Motor.d20(v);
   const nat = t.natural;
-  const total = nat + opts.mod;
-  const cd = opts.cd != null && opts.cd !== '' ? +opts.cd : null;
-  const crit = nat >= (opts.critMin || 20);
+  const total = nat + cfg.mod;
+  const crit = nat >= (cfg.critMin || 20);
   const pifia = nat === 1;
-  let exito = null;
-  if (crit) exito = true; else if (pifia) exito = false; else if (cd != null) exito = total >= cd;
-  App.vent = 0;
-  const res = { ...opts, dados: t.dados, nat, total, cd, crit, pifia, exito, v, rango };
-  apuntar(opts.titulo, total, `d20${v > 0 ? ' con ventaja' : v < 0 ? ' con desventaja' : ''}: ${t.dados.join(' · ')} ${S(opts.mod)}`);
-  mostrarTirada(res);
-  vibrar(crit ? [15, 40, 15] : 12);
-  return res;
-}
+  apuntar(cfg.titulo, total, `d20${v > 0 ? ' con ventaja' : v < 0 ? ' con desventaja' : ''}: ${t.dados.join(' · ')} ${S(cfg.mod)}`);
 
-function mostrarTirada(res) {
-  const kept = res.dados.length > 1 ? (res.v > 0 ? Math.max(...res.dados) : Math.min(...res.dados)) : res.dados[0];
-  let usado = false;
-  const dados = res.dados.map(n => {
-    const cls = n === kept && !usado ? (usado = true, (res.crit ? ' crit' : res.pifia ? ' pifia' : '')) : ' descartado';
-    return `<span class="dado${cls}">${n}</span>`;
+  let marcado = false;
+  const dados = t.dados.map(n => {
+    const es = n === nat && !marcado; if (es) marcado = true;
+    return dadoRodando(n, 20, es ? (crit ? 'crit' : pifia ? 'pifia' : '') : 'descartado');
   }).join('');
-  const notas = [];
-  if (res.v > 0) notas.push('Ventaja: te quedas con el más alto.');
-  if (res.v < 0) notas.push('Desventaja: te quedas con el más bajo.');
-  if (res.rango.texto) notas.push(res.rango.texto + '.');
-  if (res.crit) notas.push(res.textoCrit || '20 natural: éxito y algo extra a tu favor.');
-  if (res.pifia) notas.push(res.textoPifia || '1 natural: fallo y algo sale mal.');
-  if (res.rango.extra === 'domina' && res.textoDomina) notas.push(res.textoDomina);
-  if (res.rango.extra === 'superado' && res.textoSuperado) notas.push(res.textoSuperado);
-  (res.notas || []).forEach(n => notas.push(n));
-
-  let ver = '';
-  if (res.crit) ver = '<span class="veredicto crit">Crítico</span>';
-  else if (res.pifia) ver = '<span class="veredicto mal">Pifia</span>';
-  else if (res.exito === true) ver = '<span class="veredicto ok">Éxito</span>';
-  else if (res.exito === false) ver = '<span class="veredicto mal">Fallo</span>';
-
-  const acciones = (res.acciones || []).filter(a => !a.si || a.si(res));
+  const ver = crit ? '<span class="veredicto crit">Crítico</span>' : pifia ? '<span class="veredicto mal">Pifia</span>' : '';
+  const nota = crit ? cfg.notaCrit : pifia ? cfg.notaPifia : '';
+  const extras = (cfg.extras || []).filter(x => !x.si || x.si({ crit, pifia }));
   const humano = App.pj.raza === 'humano' && !App.pj.repeticionUsada;
+
   $('tirada').innerHTML = `
-    <div class="tirada-t" id="tirada_titulo">${esc(res.titulo)}</div>
-    <div class="tirada-f">1d20 ${S(res.mod)}${res.etiquetaMod ? ` (${esc(res.etiquetaMod)})` : ''}${res.cd != null ? ` · contra ${res.cd}` : ''}</div>
+    <div class="tirada-t" id="tirada_titulo">${esc(cfg.titulo)}</div>
+    <div class="tirada-f">d20 ${S(cfg.mod)}${v ? (v > 0 ? ' · ventaja' : ' · desventaja') : ''}</div>
     <div class="dados">${dados}</div>
-    <div class="tirada-total">${res.total}</div>
-    ${ver}
-    ${notas.length ? `<div class="tirada-notas">${notas.map(n => `<div>${esc(n)}</div>`).join('')}</div>` : ''}
-    <div class="fila-btn">
-      ${acciones.map((a, i) => `<button class="btn fino" data-tacc="${i}">${esc(a.etiqueta)}</button>`).join('')}
-      ${humano ? '<button class="btn fino" data-tacc="humano">Repetir (Humano)</button>' : ''}
-      <button class="btn fino prim" data-tacc="cerrar">Cerrar</button>
+    <div class="tirada-res">
+      <div class="tirada-total">${total}</div>
+      ${ver}
+      ${nota ? `<div class="tirada-notas"><div>${esc(nota)}</div></div>` : ''}
+      <div class="fila-btn">
+        <button class="btn fino" data-tacc="v1">Con ventaja</button>
+        <button class="btn fino" data-tacc="v-1">Con desventaja</button>
+      </div>
+      <div class="fila-btn">
+        ${extras.map((x, i) => `<button class="btn fino" data-tacc="${i}">${esc(x.etiqueta)}</button>`).join('')}
+        ${humano ? '<button class="btn fino" data-tacc="humano">Repetir</button>' : ''}
+        <button class="btn fino prim" data-tacc="cerrar">Cerrar</button>
+      </div>
     </div>`;
-  App._tirada = { res, acciones };
+  App._tirada = { cfg, acciones: extras.map(x => ({ fn: () => x.fn({ crit, pifia }) })) };
   $('velo_tirada').hidden = false;
+  rodar(crit ? [15, 40, 15, 40, 30] : pifia ? [40] : [14]);
 }
 
 function mostrarSimple({ titulo, formula, dados, total, notas = [], veredicto = '', acciones = [] }) {
+  // Las caras del dado que «rueda» salen de la fórmula (d6, 2d8, d10…)
+  const caras = +((/d(\d+)/.exec(formula || '') || [])[1] || 6);
   $('tirada').innerHTML = `
     <div class="tirada-t" id="tirada_titulo">${esc(titulo)}</div>
     ${formula ? `<div class="tirada-f">${esc(formula)}</div>` : ''}
-    ${dados && dados.length ? `<div class="dados">${dados.map(n => `<span class="dado">${n}</span>`).join('')}</div>` : ''}
-    <div class="tirada-total">${esc(total)}</div>
-    ${veredicto}
-    ${notas.length ? `<div class="tirada-notas">${notas.map(n => `<div>${esc(n)}</div>`).join('')}</div>` : ''}
-    <div class="fila-btn">
-      ${acciones.map((a, i) => `<button class="btn fino" data-tacc="${i}">${esc(a.etiqueta)}</button>`).join('')}
-      <button class="btn fino prim" data-tacc="cerrar">Cerrar</button>
+    ${dados && dados.length ? `<div class="dados">${dados.map(n => dadoRodando(n, caras, '')).join('')}</div>` : ''}
+    <div class="tirada-res">
+      <div class="tirada-total">${esc(total)}</div>
+      ${veredicto}
+      ${notas.length ? `<div class="tirada-notas">${notas.map(n => `<div>${esc(n)}</div>`).join('')}</div>` : ''}
+      <div class="fila-btn">
+        ${acciones.map((a, i) => `<button class="btn fino" data-tacc="${i}">${esc(a.etiqueta)}</button>`).join('')}
+        <button class="btn fino prim" data-tacc="cerrar">Cerrar</button>
+      </div>
     </div>`;
-  App._tirada = { res: null, acciones };
+  App._tirada = { cfg: null, acciones };
   $('velo_tirada').hidden = false;
-  vibrar(10);
+  rodar([12]);
+}
+
+/* ── El «roll» ──────────────────────────────────────────────────
+   Los dados giran cambiando de cara cada vez más despacio, se asientan
+   uno tras otro con un golpe, y solo entonces aparecen el total y los
+   botones: el resultado no se adelanta. Con «reducir movimiento» se
+   muestra directo. Se usa setTimeout y no requestAnimationFrame para que
+   funcione igual con la pestaña en segundo plano. */
+function dadoRodando(valor, caras, clase) {
+  return `<span class="dado rodando" data-v="${valor}" data-caras="${caras}" data-c="${clase}">${1 + Math.floor(Math.random() * caras)}</span>`;
+}
+function rodar(vibracionFinal) {
+  clearTimeout(App._rodarT);
+  const token = App._rodarToken = (App._rodarToken || 0) + 1;
+  const card = $('tirada');
+  const dados = [...card.querySelectorAll('.dado[data-v]')];
+  const res = card.querySelector('.tirada-res');
+  const asentar = d => {
+    d.textContent = d.dataset.v;
+    d.classList.remove('rodando');
+    d.classList.add('asentado');
+    if (d.dataset.c) d.classList.add(d.dataset.c);
+  };
+  const mostrar = () => { res && res.classList.add('visible'); vibrar(vibracionFinal); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !dados.length) {
+    dados.forEach(asentar); mostrar(); return;
+  }
+  vibrar([6, 50, 6, 60, 6, 80, 6]);
+  const esperas = [45, 50, 55, 60, 70, 80, 95, 115, 140, 170];   // ~0,9 s, frenando
+  let paso = 0;
+  const tic = () => {
+    if (token !== App._rodarToken) return;
+    dados.forEach(d => { if (d.classList.contains('rodando')) d.textContent = 1 + Math.floor(Math.random() * (+d.dataset.caras || 20)); });
+    if (paso < esperas.length) { App._rodarT = setTimeout(tic, esperas[paso++]); return; }
+    // se asientan de uno en uno
+    dados.forEach((d, i) => setTimeout(() => { if (token === App._rodarToken) asentar(d); }, i * 110));
+    App._rodarT = setTimeout(() => { if (token === App._rodarToken) mostrar(); }, (dados.length - 1) * 110 + 160);
+  };
+  tic();
 }
 
 function apuntar(titulo, total, detalle) {
@@ -176,114 +188,67 @@ function apuntar(titulo, total, detalle) {
   guardar();
 }
 
-/* ── Tiradas concretas ──────────────────────────────────────── */
-function tiradaPrueba(a) {
+/* ── Qué se tira ────────────────────────────────────────────── */
+const NOM_ATAQUE = { cac: 'Cuerpo a cuerpo', dist: 'A distancia', magia: 'Mágico' };
+function cfgPrueba(a) { const c = calc(); return { titulo: `Prueba de ${NOMBRE_ATR[a]}`, mod: c.mods[a] }; }
+function cfgSalvacion(a) {
   const c = calc();
-  tirarD20({ titulo: `Prueba de ${NOMBRE_ATR[a]}`, mod: c.mods[a], etiquetaMod: a, cd: App.rival.cd,
-    notas: ['Las pruebas no suman Competencia.'] });
+  return { titulo: `Salvación de ${NOMBRE_ATR[a]}`, mod: c.mods[a] + c.comp,
+    notaCrit: 'Resistes y algo sale a tu favor.', notaPifia: 'Fallas y algo sale mal.' };
 }
-function tiradaSalvacion(a) {
+function cfgAtaque(tipo) {
   const c = calc();
-  const notas = [];
-  if (c.resist.length) notas.push(`Tus resistencias (${c.resist.map(r => RESISTENCIAS[r]).join(', ')}) dan ventaja contra ese peligro: márcala antes de tirar.`);
-  tirarD20({ titulo: `Salvación de ${NOMBRE_ATR[a]}`, mod: c.mods[a] + c.comp, etiquetaMod: `${a} ${S(c.mods[a])} · Comp ${S(c.comp)}`,
-    rangoMio: c.rango, cd: App.rival.cd, notas,
-    textoDomina: 'Dominas: aunque falles, solo sufres la mitad del efecto.',
-    textoSuperado: 'Superado: aunque tengas éxito, sufres la mitad del efecto.' });
-}
-function tiradaAtaque(tipo) {
-  const c = calc();
-  const nombres = { cac: 'cuerpo a cuerpo', dist: 'a distancia', magia: 'mágico' };
-  const atr = { cac: 'FUE', dist: 'DES', magia: 'MEN' }[tipo];
-  // El dado de clase vale para el arma (guerrero y pícaro) o el foco (mago);
-  // el clérigo lo usa con su arma y con su magia. Lo demás hace d4.
   const suyo = { guerrero: tipo !== 'magia', picaro: tipo !== 'magia', mago: tipo === 'magia', clerigo: true }[App.pj.clase];
-  tirarD20({
-    titulo: `Ataque ${nombres[tipo]}`, mod: c.ataque[tipo], etiquetaMod: `${atr} ${S(c.mods[atr])} · Comp ${S(c.comp)}`,
-    rangoMio: c.rangoArma, cd: App.rival.cd, critMin: c.critMin,
-    textoCrit: 'Crítico: impactas siempre y tiras el daño dos veces.',
-    textoPifia: 'Pifia: fallas y el enemigo te ataca gratis, o se rompe el arma o la munición.',
-    textoDomina: 'Dominas: si impactas, haces el máximo del dado sin tirar.',
-    textoSuperado: 'Superado: aunque impactes, solo haces 1 de daño.',
-    notas: suyo ? [] : ['No es la forma de atacar de tu clase: haces d4 de daño.'],
-    acciones: [
-      { etiqueta: 'Tirar daño', si: r => r.exito !== false, fn: r => tiradaDano({ crit: r.crit, domina: r.rango.extra === 'domina', superado: r.rango.extra === 'superado', d4: !suyo }) },
-      { etiqueta: 'Acierto: +1 Combo', si: r => App.pj.clase === 'picaro' && r.exito !== false, fn: () => ajustarRecurso(1) },
-    ],
-  });
+  return {
+    titulo: `Atacar · ${NOM_ATAQUE[tipo]}`, mod: c.ataque[tipo], critMin: c.critMin,
+    notaCrit: 'Alcanzas siempre, no se puede bloquear y el daño se tira dos veces.',
+    notaPifia: 'Fallas, y se te rompe el arma o la munición, o el enemigo te ataca gratis.',
+    extras: [{ etiqueta: 'Daño', si: r => !r.pifia, fn: r => tiradaDano({ crit: r.crit, d4: !suyo }) }],
+  };
 }
-function tiradaDefensa() {
+/* Bloquear (gasta la Reacción): tirada de combate cuerpo a cuerpo, +2 con
+   escudo, contra el resultado del ataque. */
+function cfgBloqueo() {
   const c = calc();
-  tirarD20({
-    titulo: 'Evitar un ataque', mod: c.defensa, etiquetaMod: `Defensa (Guardia ${c.guardia} − 10)`,
-    rangoMio: c.rangoArmadura, cd: App.rival.cd,
-    textoCrit: 'Crítico: evitas el ataque y contraatacas gratis.',
-    textoPifia: 'Pifia: te impacta, recibes el daño máximo y tu Armadura no cuenta.',
-    textoDomina: 'Tu armadura domina: aunque te impacte, solo recibes 1 de daño.',
-    textoSuperado: 'Tu armadura está superada: aunque lo evites, recibes la mitad del daño.',
-    acciones: [
-      { etiqueta: 'Bloquear (Reacción)', si: r => r.exito === false && c.bloqueo != null && !App.pj.reaccion && !r.pifia, fn: () => tiradaBloqueo() },
-      { etiqueta: 'Recibir daño', si: r => r.exito === false, fn: () => dlgDano() },
-    ],
-  });
+  return { titulo: 'Bloquear', mod: c.bloqueo,
+    notaCrit: 'Bloqueas y contraatacas gratis.', notaPifia: 'No bloqueas: daño máximo y tu Armadura no cuenta.' };
 }
-function tiradaBloqueo() {
+function cfgIniciativa() {
   const c = calc();
-  if (c.bloqueo == null) { aviso('Necesitas un escudo o un arma cuerpo a cuerpo para bloquear', 'mal'); return; }
-  if (App.pj.reaccion) { aviso('Ya gastaste tu Reacción esta ronda', 'mal'); return; }
-  App.pj.reaccion = true; guardar(); render();
-  tirarD20({
-    titulo: 'Bloqueo', mod: c.bloqueo, etiquetaMod: 'FUE + Comp' + (App.pj.equipo.escudo && App.pj.equipo.escudo.sub !== 'secundaria' ? ' + escudo' : ''),
-    rangoMio: c.rangoArmadura, cd: App.rival.cd,
-    notas: ['Gasta tu Reacción de la ronda. Si igualas o superas la CD de Ataque, no recibes daño.'],
-    acciones: [{ etiqueta: 'Recibir daño', si: r => r.exito === false, fn: () => dlgDano() }],
-  });
-}
-function tiradaIniciativa() {
-  const c = calc();
-  tirarD20({ titulo: '¿Quién actúa primero?', mod: c.mods.DES, etiquetaMod: 'DES', cd: 12, extraVent: c.agil ? 1 : 0,
-    notas: ['Con éxito actúas antes que los monstruos; si fallas, después.'].concat(c.agil ? ['Ágil: tiras con ventaja.'] : []) });
-}
-function tiradaHuir() {
-  const c = calc();
-  tirarD20({ titulo: 'Huir', mod: c.mods.DES, etiquetaMod: 'DES', cd: 12 });
+  return { titulo: 'Iniciativa (CD 12)', mod: c.mods.DES };
 }
 
-function tiradaDano({ crit = false, domina = false, superado = false, d4 = false, conRecurso = false, emboscada = false } = {}) {
+function tiradaDano({ crit = false, d4 = false, conRecurso = false, emboscada = false } = {}) {
   const c = calc();
   const expr = d4 ? 'd4' : c.dado;
-  const notas = [];
-  let total, dados = [];
-  if (superado) { total = 1; notas.push('Superado: solo 1 de daño.'); }
-  else if (domina || emboscada) { total = Motor.maxDe(expr) * (crit ? 2 : 1); notas.push(emboscada ? 'Emboscada: daño máximo del dado.' : 'Dominas: daño máximo del dado.'); }
+  let total, dados = [], formula = expr + (crit ? ' ×2' : '');
+  if (emboscada) { total = Motor.maxDe(expr); formula = `${expr} al máximo`; }
   else {
     const a = Motor.tirar(expr); dados = a.dados.slice(); total = a.total;
-    if (crit) { const b = Motor.tirar(expr); dados = dados.concat(b.dados); total += b.total; notas.push('Crítico: el daño se tira dos veces.'); }
+    if (crit) { const b = Motor.tirar(expr); dados = dados.concat(b.dados); total += b.total; }
   }
-  let formula = expr + (crit ? ' ×2' : '');
-  if (conRecurso && !superado) {
-    const idx = recursoActual(c);
-    if (idx >= 0) {
-      const rr = Motor.tirar(ESCALERA[idx]);
-      total += rr.total; dados = dados.concat(rr.dados);
-      formula += ` + ${ESCALERA[idx]} (${c.recurso.nombre})`;
-      if (App.pj.clase === 'guerrero') { App.pj.recurso = idx - 1 < 0 ? 0 : idx - 1; notas.push('Golpe Brutal: la Furia baja un escalón.'); }
-      if (App.pj.clase === 'picaro') { App.pj.recurso = -1; notas.push('Eviscerar: el Combo se vacía.'); }
-      guardar(); render();
-    }
+  const idx = recursoActual(c);
+  if (conRecurso && idx >= 0) {
+    const rr = Motor.tirar(ESCALERA[idx]);
+    total += rr.total; dados = dados.concat(rr.dados);
+    formula += ` + ${ESCALERA[idx]} de ${c.recurso.nombre}`;
+    App.pj.recurso = App.pj.clase === 'guerrero' ? Math.max(0, idx - 1) : -1;
+    guardar(); render();
   }
-  notas.push('Resta la Armadura del objetivo. El daño mínimo es 1.');
   apuntar('Daño', total, formula);
-  mostrarSimple({ titulo: 'Daño', formula, dados, total, notas });
+  const puedeRec = !conRecurso && idx >= 0 && (App.pj.clase === 'guerrero' || App.pj.clase === 'picaro');
+  const acciones = [];
+  if (!crit && !emboscada) acciones.push({ etiqueta: 'Crítico ×2', fn: () => tiradaDano({ crit: true, d4, conRecurso }) });
+  if (puedeRec) acciones.push({ etiqueta: App.pj.clase === 'guerrero' ? '+ Furia' : '+ Combo', fn: () => tiradaDano({ crit, d4, conRecurso: true, emboscada }) });
+  if (App.pj.clase === 'picaro' && !emboscada && !crit) acciones.push({ etiqueta: 'Emboscada', fn: () => tiradaDano({ emboscada: true, d4 }) });
+  mostrarSimple({ titulo: 'Daño', formula, dados, total, notas: ['Réstale la Armadura del enemigo (mínimo 1).'], acciones });
 }
 
 /* ── Recurso ────────────────────────────────────────────────── */
 function ajustarRecurso(delta) {
   const c = calc();
-  let idx = recursoActual(c) + delta;
-  idx = Motor.clamp(idx, -1, c.recurso.maxIdx);
-  if (!c.recurso.sube && idx < -1) idx = -1;
-  App.pj.recurso = idx; guardar(); render();
+  App.pj.recurso = Motor.clamp(recursoActual(c) + delta, c.recurso.min ?? -1, c.recurso.maxIdx);
+  guardar(); render();
 }
 function usarRecurso() {
   const c = calc();
@@ -296,85 +261,16 @@ function usarRecurso() {
   apuntar(`Usar ${c.recurso.nombre}`, t.total, ESCALERA[idx]);
   mostrarSimple({
     titulo: `Usar ${c.recurso.nombre}`, formula: ESCALERA[idx], dados: t.dados, total: t.total,
-    veredicto: baja ? '<span class="veredicto mal">Baja un escalón</span>' : '<span class="veredicto ok">Se mantiene</span>',
-    notas: [baja ? (idx - 1 < 0 ? `Te quedas sin ${c.recurso.nombre} hasta descansar.` : `Ahora: ${ESCALERA[idx - 1]}.`) : 'Con 1 o 2 habría bajado un escalón.'],
+    veredicto: baja ? `<span class="veredicto mal">${idx - 1 < 0 ? 'Agotado' : 'Baja un escalón'}</span>` : '<span class="veredicto ok">Se mantiene</span>',
   });
 }
 
-/* ── Daño recibido y curación ───────────────────────────────── */
-function dlgDano() {
-  const c = calc();
-  const orco = App.pj.raza === 'orco';
-  abrirDlg({
-    titulo: 'Recibir daño',
-    cuerpo: `<input type="number" inputmode="numeric" id="dano_in" placeholder="Daño del golpe" aria-label="Daño recibido">
-      <label class="marca"><input type="checkbox" id="dano_arm" ${c.armadura ? 'checked' : ''}> Restar mi Armadura (${c.armadura})</label>
-      ${orco ? `<label class="marca"><input type="checkbox" id="dano_orco" ${App.orcoUsado ? 'disabled' : ''}> Rasgo orco: el recurso sube un escalón extra${App.orcoUsado ? ' (ya usado en este combate)' : ''}</label>` : ''}
-      <p class="leyenda">El daño mínimo es siempre 1.${App.pj.clase === 'guerrero' ? ' Tu Furia sube un escalón.' : ''}</p>`,
-    pie: '<button class="btn" data-dlg="cerrar">Cancelar</button><button class="btn prim" data-dlg="ok">Aplicar</button>',
-    onMontar: d => setTimeout(() => d.querySelector('#dano_in')?.focus(), 60),
-    onClick: a => {
-      if (a !== 'ok') return;
-      const n = parseInt($('dano_in').value, 10);
-      if (isNaN(n) || n < 0) { aviso('Escribe el daño', 'mal'); return; }
-      const final = $('dano_arm')?.checked ? Math.max(1, n - c.armadura) : Math.max(n > 0 ? 1 : 0, n);
-      const extraOrco = $('dano_orco')?.checked;
-      cerrarDlg();
-      recibirDano(final, extraOrco);
-    },
-  });
-}
-function recibirDano(n, extraOrco) {
-  const c = calc();
-  const antes = pvActual(c);
-  App.pj.pv = Math.max(0, antes - n);
-  let subidas = 0;
-  if (App.pj.clase === 'guerrero' && n > 0) subidas++;
-  if (extraOrco) { subidas++; App.orcoUsado = true; }
-  if (subidas) {
-    const idx = recursoActual(c);
-    App.pj.recurso = Math.min(c.recurso.maxIdx, Math.max(idx, -1) + subidas);
-  }
-  guardar(); render();
-  aviso(`−${n} PV` + (subidas ? ` · ${c.recurso.nombre} ${Motor.escalon(App.pj.recurso)}` : ''));
-  if (App.pj.pv === 0) setTimeout(() => aviso('Has caído: tira Fuera de Combate cuando acabe la pelea', 'mal'), 400);
-  vibrar([20, 30, 20]);
-}
-function dlgCurar() {
-  const c = calc();
-  const pr = App.pj.pocionRango || 1;
-  const pociones = +App.pj.consumibles.pociones || 0;
-  abrirDlg({
-    titulo: 'Curar',
-    cuerpo: `<input type="number" inputmode="numeric" id="cura_in" placeholder="PV que recuperas" aria-label="PV recuperados">
-      <button class="btn ancho" data-dlg="pocion" ${pociones ? '' : 'disabled'}>Beber poción de Rango ${R(pr)} (${POCION_CURA[pr]}) · te quedan ${pociones}</button>`,
-    pie: '<button class="btn" data-dlg="cerrar">Cancelar</button><button class="btn prim" data-dlg="ok">Curar</button>',
-    onClick: a => {
-      if (a === 'pocion') {
-        const t = Motor.tirar(POCION_CURA[pr]);
-        App.pj.consumibles.pociones = pociones - 1;
-        App.pj.pv = Math.min(c.pvMax, pvActual(c) + t.total);
-        cerrarDlg(); guardar(); render();
-        apuntar('Poción', t.total, POCION_CURA[pr]);
-        mostrarSimple({ titulo: 'Poción', formula: POCION_CURA[pr], dados: t.dados, total: `+${t.total}`, notas: [`PV: ${App.pj.pv} / ${c.pvMax}`] });
-        return;
-      }
-      if (a !== 'ok') return;
-      const n = parseInt($('cura_in').value, 10);
-      if (isNaN(n) || n <= 0) { aviso('Escribe cuánto curas', 'mal'); return; }
-      App.pj.pv = Math.min(c.pvMax, pvActual(c) + n);
-      cerrarDlg(); guardar(); render(); aviso(`+${n} PV`);
-    },
-  });
-}
-
-/* ── Fuera de Combate y descansos ───────────────────────────── */
+/* ── Caer y descansar ───────────────────────────────────────── */
 function dlgFueraCombate() {
   abrirDlg({
     titulo: 'Fuera de Combate',
-    cuerpo: `<p class="nota">Tira cuando termine el combate o cuando un compañero te atienda.</p>
-      <label class="marca"><input type="checkbox" id="fc_golpes"> Me siguieron golpeando en el suelo (2d6, el más bajo)</label>`,
-    pie: '<button class="btn" data-dlg="cerrar">Cancelar</button><button class="btn prim" data-dlg="ok">Tirar</button>',
+    cuerpo: `<label class="marca"><input type="checkbox" id="fc_golpes"> Me siguieron golpeando en el suelo</label>`,
+    pie: '<button class="btn" data-dlg="cerrar">Cancelar</button><button class="btn prim" data-dlg="ok">Tirar d6</button>',
     onClick: a => {
       if (a !== 'ok') return;
       const dos = $('fc_golpes').checked;
@@ -384,7 +280,7 @@ function dlgFueraCombate() {
       const [nom, txt] = FUERA_COMBATE[n];
       const c = calc();
       const acciones = [];
-      if (n === 6) { const t = Motor.tirar('d4'); App.pj.pv = Math.min(c.pvMax, t.total); }
+      if (n === 6) App.pj.pv = Math.min(c.pvMax, Motor.tirar('d4').total);
       if (n === 5) App.pj.pv = 1;
       if (n === 4) App.pj.heridas.push('Inconsciente hasta el final del día');
       if (n === 1) App.pj.heridas.push('Muerto');
@@ -392,7 +288,7 @@ function dlgFueraCombate() {
         App.pj.base[a2] = Math.max(3, (+App.pj.base[a2] || 10) - 1);
         App.pj.heridas.push(`Herida grave: −1 ${NOMBRE_ATR[a2]} para siempre`);
       }) }));
-      if (n === 3) ATRIBUTOS.forEach(a2 => acciones.push({ etiqueta: `Maltrecho: ${a2}`, fn: () => cambio(() => {
+      if (n === 3) ATRIBUTOS.forEach(a2 => acciones.push({ etiqueta: a2, fn: () => cambio(() => {
         App.pj.heridas.push(`Maltrecho: desventaja en ${NOMBRE_ATR[a2]} hasta descansar en la ciudad`);
       }) }));
       guardar(); render();
@@ -400,10 +296,18 @@ function dlgFueraCombate() {
       mostrarSimple({
         titulo: 'Fuera de Combate', formula: dos ? '2d6, el más bajo' : 'd6', dados: dos ? [d1, d2] : [d1], total: n,
         veredicto: `<span class="veredicto ${n >= 5 ? 'ok' : n === 1 ? 'mal' : 'crit'}">${esc(nom)}</span>`,
-        notas: [txt].concat(n === 6 ? [`Te levantas con ${App.pj.pv} PV.`] : n === 2 ? ['Elige el atributo que pierde un punto:'] : n === 3 ? ['Elige el atributo afectado:'] : []),
+        notas: [txt].concat(n === 2 ? ['¿Qué atributo pierde un punto?'] : n === 3 ? ['¿Qué atributo queda maltrecho?'] : []),
         acciones,
       });
     },
+  });
+}
+function dlgDescansar() {
+  abrirDlg({
+    titulo: 'Descansar',
+    cuerpo: `<div class="opciones">${DESCANSOS.map(d => `
+      <button class="opcion" data-dlg="${d.id}"><span class="opcion-n">${esc(d.nombre)}<small>${esc(d.coste)}</small></span><span class="opcion-t">${esc(d.txt)}</span></button>`).join('')}</div>`,
+    onClick: a => { if (DESCANSOS.some(d => d.id === a)) { cerrarDlg(); descansar(a); } },
   });
 }
 function descansar(id) {
@@ -414,85 +318,35 @@ function descansar(id) {
     pj.pv = Math.min(c.pvMax, pvActual(c) + t.total);
     guardar(); render();
     apuntar('Descanso corto', t.total, c.cl.vida);
-    mostrarSimple({ titulo: 'Descanso corto', formula: `${c.cl.vida} (dado de vida)`, dados: t.dados, total: `+${t.total}`, notas: [`PV: ${pj.pv} / ${c.pvMax}`] });
+    mostrarSimple({ titulo: 'Descanso corto', formula: c.cl.vida, dados: t.dados, total: `+${t.total}`, notas: [`PV ${pj.pv} / ${c.pvMax}`] });
     return;
   }
   if (id === 'largo') {
-    if ((+pj.consumibles.raciones || 0) < 1) { aviso('Sin ración no descansas: al día siguiente, salvación de Vitalidad CD 12', 'mal'); return; }
+    if ((+pj.consumibles.raciones || 0) < 1) { aviso('Sin ración no descansas', 'mal'); return; }
     pj.consumibles.raciones -= 1;
     pj.pv = Math.min(c.pvMax, pvActual(c) + Math.floor(c.pvMax / 2));
     if (!c.recurso.sube) pj.recurso = c.recurso.maxIdx;
-    pj.reaccion = false;
     guardar(); render();
-    aviso(`Descanso largo: +${Math.floor(c.pvMax / 2)} PV${!c.recurso.sube ? `, ${c.recurso.nombre} al máximo` : ''} · −1 ración`);
+    aviso(`+${Math.floor(c.pvMax / 2)} PV · −1 ración`);
     return;
   }
   pj.pv = c.pvMax;
   pj.recurso = c.recurso.sube ? c.recurso.inicioIdx : c.recurso.maxIdx;
-  pj.reaccion = false;
   pj.heridas = pj.heridas.filter(h => !/^Maltrecho|^Inconsciente/.test(h));
   guardar(); render();
-  aviso('Descanso en la ciudad: todo recuperado');
+  aviso('Todo recuperado');
 }
 function nuevoCombate() {
   const c = calc();
-  App.pj.reaccion = false; App.orcoUsado = false;
-  if (c.recurso.sube) App.pj.recurso = c.recurso.inicioIdx;
+  App.pj.recurso = c.recurso.inicioIdx;
   guardar(); render();
-  aviso(`Nuevo combate${c.recurso.sube ? ` · ${c.recurso.nombre} ${Motor.escalon(c.recurso.inicioIdx)}` : ''}`);
-}
-
-/* ── Profesión ──────────────────────────────────────────────── */
-function dlgRecolectar() {
-  const c = calc(); const p = PROFESIONES[App.pj.profesion];
-  abrirDlg({
-    titulo: `Recolectar · ${p.recolecta}`,
-    cuerpo: `<p class="nota">${esc(p.donde)}. 1d20 + ${NOMBRE_ATR[p.atrR]} contra la CD del material.</p>
-      <div class="opciones">
-        <button class="opcion" data-dlg="12"><span class="opcion-n">Habitual <small>CD 12</small></span></button>
-        <button class="opcion" data-dlg="14"><span class="opcion-n">Difícil de encontrar <small>CD 14</small></span></button>
-        <button class="opcion" data-dlg="16"><span class="opcion-n">Excepcional <small>CD 16</small></span></button>
-      </div>`,
-    onClick: a => {
-      const cd = parseInt(a, 10); if (!cd) return;
-      cerrarDlg();
-      tirarD20({ titulo: `Recolectar (${p.recolecta})`, mod: c.mods[p.atrR], etiquetaMod: p.atrR, cd,
-        textoCrit: 'Crítico: consigues 2 materiales del Rango de la región.',
-        notas: ['Con éxito consigues 1 material del Rango de la región.'],
-        acciones: [{ etiqueta: 'Añadir material', si: r => r.exito, fn: r => dlgMaterial(null, { nombre: p.material[0].toUpperCase() + p.material.slice(1), cantidad: r.crit ? 2 : 1 }) }] });
-    },
-  });
-}
-function dlgFabricar() {
-  const c = calc(); const p = PROFESIONES[App.pj.profesion]; const pr = App.pj.profRango || 1;
-  const ops = Array.from({ length: pr }, (_, i) => i + 1).map(r =>
-    `<button class="opcion" data-dlg="${r}"><span class="opcion-n">Rango ${R(r)} <small>CD ${CD_FABRICAR[r]}</small></span></button>`).join('');
-  abrirDlg({
-    titulo: `Fabricar · ${p.nombre}`,
-    cuerpo: `<p class="nota">${esc(p.fabrica)}. 1d20 + ${NOMBRE_ATR[p.atrF]}. Solo puedes fabricar hasta tu Rango de profesión (${R(pr)}). Si fallas, pierdes un material.</p><div class="opciones">${ops}</div>`,
-    onClick: a => {
-      const r = parseInt(a, 10); if (!r) return;
-      cerrarDlg();
-      tirarD20({ titulo: `Fabricar Rango ${R(r)}`, mod: c.mods[p.atrF], etiquetaMod: p.atrF, cd: CD_FABRICAR[r],
-        acciones: [{ etiqueta: 'Anotar lo fabricado', si: res => res.exito, fn: () => anotarFabricado(r) }] });
-    },
-  });
-}
-function anotarFabricado(r) {
-  const pj = App.pj;
-  if (r === (pj.profRango || 1)) {
-    pj.profFabricados = (pj.profFabricados || 0) + 1;
-    if (pj.profFabricados >= 3 && pj.profRango < RANGO_MAX) {
-      pj.profRango += 1; pj.profFabricados = 0;
-      aviso(`Tu profesión sube a Rango ${R(pj.profRango)} · la primera pieza de un Rango nuevo da 1 hito`);
-    } else aviso(`Fabricado (${pj.profFabricados}/3 de Rango ${R(pj.profRango)})`);
-  } else aviso('Fabricado');
-  guardar(); render();
+  aviso(`${c.recurso.nombre} ${Motor.escalon(c.recurso.inicioIdx)}`);
 }
 
 /* ══════════════════════════════════════════════════════════════
    PINTAR
 ══════════════════════════════════════════════════════════════ */
+const PAGINAS = ['ficha', 'equipo', 'notas'];
 function render() {
   const enFicha = !!App.pj;
   $('pantalla_inicio').hidden = enFicha;
@@ -500,18 +354,19 @@ function render() {
   $('pestanas').hidden = !enFicha;
   $('btn_atras').hidden = !enFicha;
   if (!enFicha) {
-    $('barra_nombre').textContent = 'Armisticio';
-    $('barra_sub').textContent = 'Ficha de personaje';
+    $('barra_nombre').textContent = 'Umbral';
+    $('barra_sub').textContent = 'Ficha para Armisticio';
     pintarInicio();
     return;
   }
   const c = calc();
   const pj = App.pj;
+  if (!PAGINAS.includes(App.pag)) App.pag = 'ficha';
   $('barra_nombre').textContent = pj.nombre || 'Sin nombre';
   $('barra_sub').textContent = `${RAZAS[pj.raza]?.nombre || ''} · ${c.cl.nombre} · Nivel ${c.nivel}`;
   document.querySelectorAll('.pest').forEach(b => b.classList.toggle('activa', b.dataset.pag === App.pag));
-  ['personaje', 'combate', 'equipo', 'diario'].forEach(p => { $('pag_' + p).hidden = p !== App.pag; });
-  ({ personaje: pintarPersonaje, combate: pintarCombate, equipo: pintarEquipo, diario: pintarDiario })[App.pag](c);
+  PAGINAS.forEach(p => { $('pag_' + p).hidden = p !== App.pag; });
+  ({ ficha: pintarFicha, equipo: pintarEquipo, notas: pintarNotas })[App.pag](c);
 }
 
 function pintarInicio() {
@@ -519,218 +374,163 @@ function pintarInicio() {
   $('pantalla_inicio').innerHTML = `
     <div class="hero">
       <img class="hero-emblema" src="icons/esqueleto-original.webp" alt="" width="120" height="120">
-      <div class="hero-marca">Armisticio</div>
-      <div class="hero-sub">La frontera no perdona. Tu equipo, tampoco.</div>
+      <div class="hero-marca">Umbral</div>
+      <div class="hero-sub">Ficha para Armisticio</div>
       <div class="hero-filete"></div>
     </div>
     <div class="pagina">
-      <div class="fila-btn">
-        <button class="btn prim" data-acc="nuevo">${ico('mas')}Nuevo personaje</button>
+      <button class="btn prim" data-acc="nuevo">${ico('mas')}Nuevo personaje</button>
+      <div class="pj-lista">
+        ${lista.length ? lista.map(p => `<button class="pj-item" data-acc="abrir" data-id="${esc(p.id)}">
+            ${p.retrato ? `<img class="pj-foto" src="${p.retrato}" alt="">` : `<span class="pj-sello">${p.nivel || 1}</span>`}
+            <span class="pj-datos"><span class="pj-nom">${esc(p.nombre || 'Sin nombre')}</span>
+            <span class="pj-sub">${esc(RAZAS[p.raza]?.nombre || '')} · ${esc(CLASES[p.clase]?.nombre || '')} · Nivel ${p.nivel || 1}</span></span>
+          </button>`).join('') : '<p class="vacio">Aún no hay nadie en la frontera.</p>'}
       </div>
       <div class="fila-btn">
         <button class="btn fino" data-acc="pregenerados">Pregenerados</button>
         <button class="btn fino" data-acc="importar">Importar</button>
+        <button class="btn fino" data-acc="exportar">Copia</button>
       </div>
-      <div class="card">
-        <div class="card-t">${ico('persona')}Tus personajes<span class="der">${lista.length}</span></div>
-        <div class="pj-lista">
-          ${lista.length ? lista.map(p => {
-            const cl = CLASES[p.clase];
-            return `<button class="pj-item" data-acc="abrir" data-id="${esc(p.id)}">
-              <span class="pj-sello">${p.nivel || 1}</span>
-              <span class="pj-datos"><span class="pj-nom">${esc(p.nombre || 'Sin nombre')}</span>
-              <span class="pj-sub">${esc(RAZAS[p.raza]?.nombre || '')} · ${esc(cl?.nombre || '')} · ${esc(PROFESIONES[p.profesion]?.nombre || '')}</span></span>
-            </button>`;
-          }).join('') : '<p class="vacio">Aún no hay nadie en la frontera. Crea un personaje o usa uno pregenerado.</p>'}
-        </div>
-      </div>
-      <button class="btn fino" data-acc="exportar">${ico('copia')}Copia de seguridad de todos</button>
       <input type="file" id="archivo" accept="application/json,.json" hidden>
     </div>`;
 }
 
 /* ── Tarjetas plegables ─────────────────────────────────────────
-   Recuerdan si quedaron abiertas o cerradas (preferencia de quien juega,
-   no dato de la ficha: va aparte, en arm_folds). Plegadas enseñan una
-   línea de resumen. */
-const FOLDS_POR_DEFECTO = { habilidades: false, profesion: false, materiales: false, tiradas: false, secuelas: false };
+   Recuerdan si quedaron abiertas (preferencia de quien juega, aparte en
+   arm_folds). Plegadas enseñan una línea de resumen. */
+const FOLDS_POR_DEFECTO = { habilidades: false, tiradas: false, referencia: false };
 function foldAbierta(id) {
   try { const p = JSON.parse(localStorage.getItem('arm_folds')) || {}; if (id in p) return !!p[id]; } catch (e) { /* sin almacenamiento */ }
   return id in FOLDS_POR_DEFECTO ? FOLDS_POR_DEFECTO[id] : true;
 }
-function tarjeta(id, titulo, icono, contenido, { peek = '', der = '', clase = '', estilo = '' } = {}) {
-  return `<details class="card fold ${clase}" data-fold="${id}" ${foldAbierta(id) ? 'open' : ''} ${estilo ? `style="${estilo}"` : ''}>
-    <summary class="card-t">${ico(icono)}<span class="card-tt">${esc(titulo)}</span>
+function tarjeta(id, titulo, contenido, { peek = '', der = '' } = {}) {
+  return `<details class="card fold" data-fold="${id}" ${foldAbierta(id) ? 'open' : ''}>
+    <summary class="card-t"><span class="card-tt">${esc(titulo)}</span>
       ${der ? `<span class="der">${der}</span>` : ''}${peek ? `<span class="peek">${peek}</span>` : ''}</summary>
     <div class="fold-cuerpo">${contenido}</div>
   </details>`;
 }
 
-function pintarPersonaje(c) {
+function pintarFicha(c) {
   const pj = App.pj;
   const pv = pvActual(c);
   const rec = c.recurso;
   const ri = recursoActual(c);
   const colorRec = { Furia: 'var(--furia)', Combo: 'var(--combo)', Maná: 'var(--mana)', Fe: 'var(--fe)' }[rec.nombre];
-  const tramos = ESCALERA.slice(0, rec.maxIdx + 1).map((e, i) => `<i class="${i <= ri ? 'lleno' : ''}" title="${e}"></i>`).join('');
+  const tramos = ESCALERA.slice(0, rec.maxIdx + 1).map((e, i) => `<i class="${i <= ri ? 'lleno' : ''}"></i>`).join('');
   const puedeSubir = pj.hitos >= c.hitosNecesarios && c.nivel < 10;
   const habPend = NIVELES_HABILIDAD.filter(n => c.nivel >= n).length - pj.habilidades.length;
 
-  $('pag_personaje').innerHTML = `
+  // Casillas de tirada: lo que se usa en cada combate
+  // Una sola tirada, la de combate, para atacar y para bloquear (v1.0)
+  const casillas = [
+    { acc: 'ataque', t: c.ataquePrincipal, n: 'Combate', v: S(c.ataque[c.ataquePrincipal]), s: NOM_ATAQUE[c.ataquePrincipal].toLowerCase() },
+    { acc: 'dano', n: 'Daño', v: c.dado, s: 'dado de clase' },
+    { n: 'Guardia', v: c.guardia, s: `desprevenido ${c.guardiaDesprevenido}` },
+  ];
+  if (pj.clase === 'clerigo') casillas.push({ acc: 'ataque', t: 'magia', n: 'Combate', v: S(c.ataque.magia), s: 'mágico' });
+  if (c.bloqueo != null) casillas.push({ acc: 'bloqueo', n: 'Bloquear', v: S(c.bloqueo), s: 'Reacción' });
+  casillas.push({ n: 'Armadura', v: c.armadura, s: `máximo ${c.armaduraMax}` });
+  casillas.push({ acc: 'iniciativa', n: 'Iniciativa', v: S(c.mods.DES), s: 'contra 12' });
+
+  const habs = c.cl.habilidades.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
+  pj.habilidades.forEach(id => {
+    for (const est of ESTILOS[pj.clase] || []) {
+      const h = est.hab.find(x => x[0] === id);
+      if (h) habs.push(`<div class="hab"><div class="hab-n">${esc(h[1])}</div><div class="hab-t">${esc(h[2])}</div></div>`);
+    }
+  });
+  c.efectos.forEach(e => habs.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
+  if (c.resist.length) habs.push(`<div class="hab"><div class="hab-t">Resistencia: ventaja al resistir ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
+
+  $('pag_ficha').innerHTML = `
+    ${c.avisos.map(a => `<div class="aviso-f">${esc(a)}</div>`).join('')}
     <div class="card portada">
       <button class="retrato${pj.retrato ? '' : ' sin'}" data-acc="retrato" aria-label="${pj.retrato ? 'Cambiar retrato' : 'Añadir retrato'}">
         ${pj.retrato ? `<img src="${pj.retrato}" alt="Retrato de ${esc(pj.nombre)}">` : `<img class="retrato-fantasma" src="icons/esqueleto-original.webp" alt=""><span>Añadir retrato</span>`}
       </button>
       <div class="portada-nom">${esc(pj.nombre || 'Sin nombre')}</div>
       <div class="portada-sub">${esc(RAZAS[pj.raza]?.nombre)} · ${esc(c.cl.nombre)} · ${esc(PROFESIONES[pj.profesion]?.nombre)}</div>
-      <div class="chips">
-        <span class="chip">Nivel <b>${c.nivel}</b></span>
-        <span class="chip">Rango <b>${R(c.rango)}</b></span>
-        <span class="chip">Comp. <b>${S(c.comp)}</b></span>
-      </div>
       <div class="portada-motivo">${esc(pj.motivo)}</div>
+      <div class="hitos">
+        <span class="hitos-n">Nivel <b>${c.nivel}</b></span>
+        <span class="hitos-n">Hitos <b>${pj.hitos}</b>/${c.nivel < 10 ? c.hitosNecesarios : '—'}</span>
+        <button class="pm" style="--c:var(--titulo)" data-acc="hitos" data-d="1" aria-label="Sumar un hito">+</button>
+      </div>
+      ${puedeSubir ? `<button class="btn prim ancho" data-acc="subir">Subir a nivel ${c.nivel + 1}</button>` : ''}
+      ${habPend > 0 ? `<button class="btn ancho" data-acc="elegir-hab">Elegir habilidad nueva</button>` : ''}
       <input type="file" id="retrato_in" accept="image/*" hidden>
     </div>
 
-    ${tarjeta('estado', 'Estado', 'corazon', `
+    ${tarjeta('estado', 'Estado', `
       <div class="pv-fila">
         <button class="pm menos" style="--c:var(--sangre-b)" data-acc="pv" data-d="-1" aria-label="Quitar 1 PV">−</button>
         <div class="pv-num"><span class="act">${pv}</span> <span class="max">/ ${c.pvMax}</span></div>
         <button class="pm" style="--c:var(--ok)" data-acc="pv" data-d="1" aria-label="Sumar 1 PV">+</button>
       </div>
       <div class="barra-pv${pv <= c.pvMax / 4 ? ' baja' : ''}"><i style="width:${Math.round(100 * pv / c.pvMax)}%"></i></div>
-      <div class="fila-btn" style="margin-top:10px">
-        <button class="btn fino" data-acc="dano">Daño</button>
-        <button class="btn fino" data-acc="curar">Curar</button>
-      </div>
       <div class="rec" style="--rc:${colorRec}">
         <div class="rec-fila">
           <span class="rec-n">${esc(rec.nombre)}</span>
+          ${rec.sube ? '' : `<button class="enlace" data-acc="rec-usar">usar</button>`}
           <span class="rec-v">${ri >= 0 ? ESCALERA[ri] : '—'}</span>
           <button class="pm menos" style="--c:${colorRec}" data-acc="rec" data-d="-1" aria-label="Bajar ${esc(rec.nombre)}">−</button>
           <button class="pm" style="--c:${colorRec}" data-acc="rec" data-d="1" aria-label="Subir ${esc(rec.nombre)}">+</button>
-          ${rec.sube ? '' : '<button class="btn fino" data-acc="rec-usar">Usar</button>'}
         </div>
         <div class="rec-tramos">${tramos}</div>
-      </div>`, { peek: `PV ${pv}/${c.pvMax}` })}
+      </div>
+      <div class="fila-btn" style="margin-top:12px">
+        ${pv === 0 ? '<button class="btn fino peligro" data-acc="fuera">Fuera de Combate</button>' : ''}
+        ${rec.sube ? '<button class="btn fino" data-acc="nuevo-combate">Nuevo combate</button>' : ''}
+        <button class="btn fino" data-acc="descansar">Descansar</button>
+      </div>`, { peek: `PV ${pv}/${c.pvMax} · ${rec.nombre} ${ri >= 0 ? ESCALERA[ri] : '—'}` })}
 
-    ${tarjeta('atributos', 'Atributos', 'persona', `
-      <div class="atrs">
-        ${ATRIBUTOS.map(a => `
-          <div class="atr">
-            <span class="atr-n">${a}</span>
+    ${tarjeta('combate', 'Combate', `
+      <div class="nums">${casillas.map(k => k.acc
+        ? `<button class="num" data-acc="${k.acc}"${k.t ? ` data-t="${k.t}"` : ''}><span class="num-n">${k.n}</span><span class="num-v">${esc(k.v)}</span><span class="num-s">${esc(k.s)}</span></button>`
+        : `<div class="num fijo"><span class="num-n">${k.n}</span><span class="num-v">${esc(k.v)}</span><span class="num-s">${esc(k.s)}</span></div>`).join('')}
+      </div>`, { peek: `Combate ${S(c.ataque[c.ataquePrincipal])} · Guardia ${c.guardia}` })}
+
+    ${tarjeta('atributos', 'Atributos', `
+      <div class="atrs">${ATRIBUTOS.map(a => `
+        <div class="atr">
+          <button class="atr-prueba" data-acc="prueba" data-a="${a}" aria-label="Prueba de ${NOMBRE_ATR[a]}">
+            <span class="atr-n">${NOMBRE_ATR[a]}</span>
             <span class="atr-mod">${S(c.mods[a])}</span>
             <span class="atr-val">${c.atr[a]}</span>
-            <div class="atr-acc">
-              <button data-acc="prueba" data-a="${a}" aria-label="Prueba de ${NOMBRE_ATR[a]}">Prueba</button>
-              <button data-acc="salva" data-a="${a}" aria-label="Salvación de ${NOMBRE_ATR[a]}">Salv.</button>
-            </div>
-          </div>`).join('')}
-      </div>`, { peek: ATRIBUTOS.map(a => `${a[0]}${S(c.mods[a])}`).join(' ') })}
+          </button>
+          <button class="atr-salva" data-acc="salva" data-a="${a}" aria-label="Salvación de ${NOMBRE_ATR[a]}">Salvación ${S(c.mods[a] + c.comp)}</button>
+        </div>`).join('')}
+      </div>`, { peek: ATRIBUTOS.map(a => `${a[0]} ${S(c.mods[a])}`).join(' · ') })}
 
-    ${tarjeta('hitos', 'Hitos', 'subir', `
-      <div class="pv-fila">
-        <button class="pm menos" data-acc="hitos" data-d="-1" aria-label="Quitar un hito">−</button>
-        <div class="pv-num"><span class="act" style="font-size:1.6rem">${pj.hitos}</span> <span class="max">/ ${c.nivel < 10 ? c.hitosNecesarios : '—'}</span></div>
-        <button class="pm" style="--c:var(--oxido-b)" data-acc="hitos" data-d="1" aria-label="Sumar un hito">+</button>
-      </div>
-      <div class="medidor"><i style="width:${Math.min(100, Math.round(100 * pj.hitos / c.hitosNecesarios))}%"></i></div>
-      ${puedeSubir ? `<button class="btn prim ancho" data-acc="subir">${ico('flecha-arriba')}Subir a nivel ${c.nivel + 1}</button>` : ''}
-      ${habPend > 0 ? `<button class="btn ancho" style="margin-top:8px" data-acc="elegir-hab">Elegir habilidad nueva</button>` : ''}`,
-      { peek: `${pj.hitos}/${c.hitosNecesarios}`, clase: puedeSubir || habPend > 0 ? 'llama' : '' })}`;
-}
-
-function pintarCombate(c) {
-  const pj = App.pj;
-  const rv = App.rival;
-  const hab = c.cl.habilidades.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
-  pj.habilidades.forEach(id => {
-    for (const est of ESTILOS[pj.clase] || []) {
-      const h = est.hab.find(x => x[0] === id);
-      if (h) hab.push(`<div class="hab"><div class="hab-n">${esc(h[1])} <small>${esc(est.estilo)}</small></div><div class="hab-t">${esc(h[2])}</div></div>`);
-    }
-  });
-  if (c.resist.length) hab.push(`<div class="hab"><div class="hab-n">Resistencia <small>equipo</small></div><div class="hab-t">Ventaja en salvaciones contra ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
-  c.efectos.forEach(e => hab.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
-  const recNom = pj.clase === 'guerrero' ? 'Golpe Brutal' : pj.clase === 'picaro' ? 'Eviscerar' : null;
-  const principal = { cac: ['Cuerpo a cuerpo', 'cac'], dist: ['A distancia', 'dist'], magia: ['Mágico', 'magia'] };
-  const otros = Object.keys(principal).filter(k => k !== c.ataquePrincipal);
-
-  $('pag_combate').innerHTML = `
-    ${c.avisos.map(a => `<div class="aviso-f">⚠ ${esc(a)}</div>`).join('')}
-    <div class="card rival-card">
-      <div class="rival">
-        <label class="campo"><span>Rango rival</span>
-          <select data-rival="rango">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${+rv.rango === n ? 'selected' : ''}>${n ? R(n) : '—'}</option>`).join('')}</select></label>
-        <label class="campo"><span>CD / Guardia</span>
-          <input type="number" inputmode="numeric" data-rival="cd" value="${esc(rv.cd)}" placeholder="—"></label>
-      </div>
-      <div class="seg" style="margin-top:10px">
-        <button data-acc="vent" data-v="-1" class="${App.vent < 0 ? 'on' : ''}">Desventaja</button>
-        <button data-acc="vent" data-v="0" class="${App.vent === 0 ? 'on' : ''}">Normal</button>
-        <button data-acc="vent" data-v="1" class="${App.vent > 0 ? 'on' : ''}">Ventaja</button>
-      </div>
-    </div>
-
-    ${tarjeta('combate', 'Combate', 'espada', `
-      <div class="nums">
-        <button class="num destacado" data-acc="ataque" data-t="${c.ataquePrincipal}"><span class="num-n">Ataque</span><span class="num-v">${S(c.ataque[c.ataquePrincipal])}</span><span class="num-s">${principal[c.ataquePrincipal][0]}</span></button>
-        <button class="num destacado" data-acc="defensa"><span class="num-n">Defensa</span><span class="num-v">${S(c.defensa)}</span><span class="num-s">evitar</span></button>
-        <button class="num" data-acc="dano-tirar"><span class="num-n">Daño</span><span class="num-v">${esc(c.dado)}</span><span class="num-s">dado de clase</span></button>
-        <div class="num"><span class="num-n">Guardia</span><span class="num-v">${c.guardia}</span><span class="num-s">desprev. ${c.guardiaDesprevenido}</span></div>
-        <div class="num"><span class="num-n">Armadura</span><span class="num-v">${c.armadura}</span><span class="num-s">máx. ${c.armaduraMax}</span></div>
-        <button class="num" data-acc="bloqueo" ${c.bloqueo == null ? 'disabled' : ''}><span class="num-n">Bloqueo</span><span class="num-v">${c.bloqueo == null ? '—' : S(c.bloqueo)}</span><span class="num-s">${pj.reaccion ? 'gastado' : 'Reacción'}</span></button>
-      </div>
-      <div class="fila-btn" style="margin-top:10px">
-        ${recNom ? `<button class="btn fino" data-acc="dano-rec">${recNom}</button>` : ''}
-        ${pj.clase === 'picaro' ? '<button class="btn fino" data-acc="dano-embosc">Emboscada</button>' : ''}
-        <button class="btn fino" data-acc="iniciativa">Iniciativa</button>
-      </div>
-      <div class="otros-ataques">
-        ${otros.map(k => `<button data-acc="ataque" data-t="${k}">${principal[k][0]} <b>${S(c.ataque[k])}</b></button>`).join('')}
-        <button data-acc="huir">Huir <b>${S(c.mods.DES)}</b></button>
-      </div>`, { peek: `Atq ${S(c.ataque[c.ataquePrincipal])} · Def ${S(c.defensa)} · Arm ${c.armadura}` })}
-
-    ${tarjeta('turno', 'Turno y descanso', 'd20', `
-      <div class="fila-btn">
-        <button class="btn fino" data-acc="nuevo-combate">Nuevo combate</button>
-        <button class="btn fino" data-acc="nueva-ronda">Nueva ronda</button>
-      </div>
-      <div class="fila-btn" style="margin-top:8px">
-        ${DESCANSOS.map(d => `<button class="btn fino" data-acc="descanso" data-id="${d.id}">${esc(d.nombre)}</button>`).join('')}
-      </div>
-      <button class="btn fino peligro ancho" style="margin-top:8px" data-acc="fuera">Fuera de Combate</button>`)}
-
-    ${tarjeta('habilidades', 'Habilidades', 'diario', hab.join(''), { peek: `${hab.length}` })}`;
+    ${tarjeta('habilidades', 'Habilidades', habs.join(''), { peek: `${habs.length}` })}`;
 }
 
 const ICO_RANURA = { arma: 'espada', armadura: 'armadura', escudo: 'escudo', amuleto: 'amuleto', anillo1: 'anillo', anillo2: 'anillo' };
 function resumenObjeto(it, tipo) {
   const partes = [];
-  if (it.ranura === 'arma') partes.push(TIPOS_ARMA[it.sub] || '');
-  if (it.ranura === 'armadura') { const a = ARMADURAS.find(x => x.id === it.sub); if (a) partes.push(`${a.nombre} · Armadura ${a.valor}`); }
-  if (it.ranura === 'escudo') { const e = ESCUDOS.find(x => x.id === it.sub); partes.push(e ? `${e.nombre} · Guardia +${e.guardia}` : 'Secundaria'); }
-  partes.push(RAREZAS[it.rareza]?.nombre || 'Común');
+  if (it.ranura === 'armadura') { const a = ARMADURAS.find(x => x.id === it.sub); if (a) partes.push(`Armadura ${a.valor}`); }
+  if (it.ranura === 'escudo') { const e = ESCUDOS.find(x => x.id === it.sub); partes.push(e ? `Guardia +${e.guardia}` : 'Secundaria'); }
   (it.props || []).forEach(p => {
     const P = PROPIEDADES.find(x => x && x.id === p.id); if (!P) return;
     let n = P.nombre;
     if (p.id === 'mejora') n = { arma: '+1 escalón', armadura: '+1 Armadura', escudo: '+1 Guardia', joya: `+1 ${p.atr || 'atributo'}` }[tipo] || n;
     if (p.id === 'atributo') n = `+1 ${p.atr || 'atributo'}`;
     if (p.id === 'resistencia') n = `Resistencia ${RESISTENCIAS[p.res] || ''}`.trim();
+    if (p.id === 'engaste') return;
     partes.push(n);
   });
   (it.gemas || []).filter(Boolean).forEach(g => partes.push(GEMAS[g].nombre));
-  return partes.filter(Boolean).join(' · ');
+  return partes.join(' · ') || RAREZAS[it.rareza]?.nombre || 'Común';
 }
 
 function pintarEquipo(c) {
   const pj = App.pj;
-  const p = PROFESIONES[pj.profesion];
   const slots = RANURAS.map(r => {
     const it = pj.equipo[r.id];
     if (!it) return `<button class="slot vacio" data-acc="slot" data-r="${r.id}">
-        <span class="slot-ico">${ico(ICO_RANURA[r.id])}</span>
-        <span class="slot-datos"><span class="slot-nom">${esc(r.nombre)}</span></span>${ico('mas')}</button>`;
+        <span class="slot-ico">${ico(ICO_RANURA[r.id])}</span><span class="slot-datos"><span class="slot-nom">${esc(r.nombre)}</span></span>${ico('mas')}</button>`;
     return `<button class="slot r-${esc(it.rareza || 'comun')}" data-acc="slot" data-r="${r.id}">
         <span class="slot-ico">${ico(ICO_RANURA[r.id])}</span>
         <span class="slot-datos"><span class="slot-nom">${esc(it.nombre || r.nombre)}</span><span class="slot-sub">${esc(resumenObjeto(it, r.tipo))}</span></span>
@@ -740,25 +540,8 @@ function pintarEquipo(c) {
   const inv = pj.inventario.map((it, i) => `
     <div class="inv-item r-${esc(it.rareza || 'comun')}">
       <button class="inv-nom" data-acc="inv-editar" data-i="${i}">${esc(it.nombre || 'Objeto')}</button>
-      <span class="inv-ran">${Motor.ranurasDe(it)}</span>
       ${it.ranura !== 'otro' ? `<button class="ibtn" data-acc="inv-equipar" data-i="${i}" aria-label="Equipar">${ico('flecha-arriba')}</button>` : ''}
     </div>`).join('');
-  const cons = Object.entries(CONSUMIBLES).map(([k, cdef]) => `
-    <div class="contador">
-      <span class="contador-n"><b>${esc(cdef.nombre)}</b>${k === 'pociones' ? `<small><button class="enlace" data-acc="pocion-rango">Rango ${R(pj.pocionRango || 1)} · ${POCION_CURA[pj.pocionRango || 1]}</button></small>` : ''}</span>
-      <button class="pm menos" data-acc="cons" data-k="${k}" data-d="-1" aria-label="Quitar">−</button>
-      <button class="contador-v" data-acc="cons-num" data-k="${k}">${+pj.consumibles[k] || 0}</button>
-      <button class="pm" data-acc="cons" data-k="${k}" data-d="1" aria-label="Añadir">+</button>
-    </div>`).join('');
-  const usos = Object.entries(DADOS_USO).map(([k, u]) => {
-    const v = pj.usos[k];
-    const tiene = v != null && v >= 0;
-    return `<div class="contador">
-      <span class="contador-n"><b>${esc(u.nombre)}</b></span>
-      <span class="contador-v">${tiene ? ESCALERA[v] : '—'}</span>
-      ${tiene ? `<button class="btn fino" data-acc="uso" data-k="${k}">Usar</button>` : `<button class="btn fino" data-acc="uso-nuevo" data-k="${k}">Nuevas</button>`}
-    </div>`;
-  }).join('');
   const mats = pj.materiales.map((m, i) => `
     <div class="contador">
       <span class="contador-n"><b>${esc(m.nombre)}</b><small>Rango ${R(m.rango || 1)}</small></span>
@@ -766,63 +549,72 @@ function pintarEquipo(c) {
       <span class="contador-v">${m.cantidad}</span>
       <button class="pm" data-acc="mat" data-i="${i}" data-d="1" aria-label="Añadir">+</button>
     </div>`).join('');
-  const puestas = RANURAS.filter(r => pj.equipo[r.id]).length;
+  const contador = (k, nombre, extra = '') => `
+    <div class="contador">
+      <span class="contador-n"><b>${nombre}</b>${extra}</span>
+      <button class="pm menos" data-acc="cons" data-k="${k}" data-d="-1" aria-label="Quitar">−</button>
+      <button class="contador-v" data-acc="cons-num" data-k="${k}">${+pj.consumibles[k] || 0}</button>
+      <button class="pm" data-acc="cons" data-k="${k}" data-d="1" aria-label="Añadir">+</button>
+    </div>`;
+  const luz = Object.entries(DADOS_USO).map(([k, u]) => {
+    const v = pj.usos[k];
+    const tiene = v != null && v >= 0;
+    return `<div class="contador">
+      <span class="contador-n"><b>${esc(u.nombre)}</b></span>
+      ${tiene ? `<button class="btn fino" data-acc="uso" data-k="${k}">Usar ${ESCALERA[v]}</button>` : `<button class="btn fino" data-acc="uso-nuevo" data-k="${k}">Nuevas</button>`}
+    </div>`;
+  }).join('');
 
   $('pag_equipo').innerHTML = `
-    ${tarjeta('equipo', 'Equipo', 'armadura', slots, { peek: `${puestas}/6` })}
+    ${tarjeta('equipo', 'Equipo', slots)}
 
-    ${tarjeta('mochila', 'Mochila', 'mochila', `
-      <div class="medidor${lleno ? ' lleno' : ''}"><i style="width:${Math.min(100, Math.round(100 * c.ranurasUsadas / Math.max(1, c.ranurasMax)))}%"></i></div>
-      ${lleno ? '<div class="aviso-f">⚠ Lo que no cabe se deja atrás.</div>' : ''}
+    ${tarjeta('mochila', 'Mochila', `
+      ${lleno ? '<div class="aviso-f">No cabe todo: lo que sobra se deja atrás.</div>' : ''}
       ${inv || '<p class="vacio">Vacía.</p>'}
+      ${mats}
       <div class="fila-btn" style="margin-top:10px">
         <button class="btn fino" data-acc="inv-nuevo">${ico('mas')}Objeto</button>
-        <button class="btn fino" data-acc="bolsas">Bolsas +${pj.ranurasExtra || 0}</button>
+        <button class="btn fino" data-acc="mat-nuevo">${ico('mas')}Material</button>
       </div>`, { der: `${c.ranurasUsadas}/${c.ranurasMax}` })}
 
-    ${tarjeta('consumibles', 'Consumibles', 'mochila', cons + usos,
-      { peek: `${+pj.consumibles.raciones || 0} raciones` })}
-
-    ${tarjeta('materiales', 'Oro y materiales', 'mochila', `
+    ${tarjeta('provisiones', 'Provisiones', `
       <div class="contador">
         <span class="contador-n"><b>Oro</b></span>
         <button class="contador-v oro" data-acc="oro">${pj.oro || 0}</button>
       </div>
-      ${mats}
-      <button class="btn fino ancho" style="margin-top:8px" data-acc="mat-nuevo">${ico('mas')}Material</button>`,
-      { peek: `${pj.oro || 0} oro` })}
-
-    ${tarjeta('profesion', p.nombre, 'lapiz', `
-      <div class="fila-btn">
-        <button class="btn fino" data-acc="recolectar">Recolectar</button>
-        <button class="btn fino" data-acc="fabricar">Fabricar</button>
-      </div>`, { der: `Rango ${R(pj.profRango || 1)} · ${pj.profFabricados || 0}/3` })}`;
+      ${contador('raciones', 'Raciones')}
+      ${contador('pociones', 'Pociones', `<small><button class="enlace" data-acc="pocion-rango">cura ${POCION_CURA[pj.pocionRango || 1]}</button></small>`)}
+      ${pj.clase === 'picaro' || +pj.consumibles.flechas ? contador('flechas', 'Flechas') : ''}
+      ${pj.clase === 'picaro' || +pj.consumibles.veneno ? contador('veneno', 'Veneno') : ''}
+      ${contador('portal', 'Portales')}
+      ${luz}`, { peek: `${pj.oro || 0} oro · ${+pj.consumibles.raciones || 0} raciones` })}`;
 }
 
-function pintarDiario(c) {
+function pintarNotas() {
   const pj = App.pj;
-  $('pag_diario').innerHTML = `
-    ${tarjeta('notas', 'Notas', 'diario', `<textarea data-campo="notas" placeholder="Pistas, nombres, deudas, lo que prometiste…" aria-label="Notas">${esc(pj.notas)}</textarea>`)}
-
-    ${tarjeta('secuelas', 'Secuelas', 'corazon',
-      pj.heridas.length ? pj.heridas.map((h, i) => `<div class="inv-item"><span class="inv-nom">${esc(h)}</span><button class="ibtn" data-acc="herida-borrar" data-i="${i}" aria-label="Quitar">${ico('cerrar')}</button></div>`).join('') : '<p class="vacio">Ninguna. De momento.</p>',
-      { peek: pj.heridas.length ? `${pj.heridas.length}` : '' })}
-
-    ${tarjeta('tiradas', 'Últimas tiradas', 'd20',
-      (pj.historial || []).length ? pj.historial.slice(0, 15).map(h => {
-        const d = new Date(h.ts);
-        return `<div class="hist"><span>${esc(h.t)}<small>${esc(h.d)} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</small></span><b>${esc(h.total)}</b></div>`;
-      }).join('') : '<p class="vacio">Aún no has tirado.</p>')}
-
-    ${tarjeta('ficha', 'Ficha', 'persona', `
-      <div class="fila-btn">
-        <button class="btn fino" data-acc="editar-ficha">${ico('lapiz')}Editar</button>
-        <button class="btn fino" data-acc="nueva-sesion">Nueva sesión</button>
+  $('pag_notas').innerHTML = `
+    <div class="card">
+      <textarea data-campo="notas" placeholder="Pistas, nombres, deudas, lo que prometiste…" aria-label="Notas">${esc(pj.notas)}</textarea>
+    </div>
+    ${pj.heridas.length ? tarjeta('secuelas', 'Secuelas', pj.heridas.map((h, i) => `<div class="inv-item"><span class="inv-nom">${esc(h)}</span><button class="ibtn" data-acc="herida-borrar" data-i="${i}" aria-label="Quitar">${ico('cerrar')}</button></div>`).join('')) : ''}
+    ${tarjeta('referencia', 'Referencia rápida', `
+      <div class="ref">
+        <div><b>Prueba</b><span>d20 + atributo</span><em>CD de la tarea</em></div>
+        <div><b>Salvación</b><span>d20 + atributo + Comp.</span><em>CD del peligro</em></div>
+        <div><b>Iniciativa</b><span>d20 + Destreza</span><em>CD 12</em></div>
+        <div><b>Atacar</b><span>d20 + Combate</span><em>Guardia del objetivo</em></div>
+        <div><b>Bloquear</b><span>d20 + Combate CaC (+2 escudo)</span><em>resultado del ataque</em></div>
+        <div><b>Daño recibido</b><span>daño − Armadura</span><em>mínimo 1</em></div>
       </div>
-      <div class="fila-btn" style="margin-top:8px">
-        <button class="btn fino" data-acc="exportar-uno">${ico('copia')}Exportar</button>
-        <button class="btn fino peligro" data-acc="borrar-pj">${ico('basura')}Borrar</button>
-      </div>`)}`;
+      <p class="leyenda">Rango: 1 por encima, ventaja; 1 por debajo, desventaja; 2 o más, además dominas o estás superado. Atacar: tu arma. Bloquear a un monstruo: tu armadura. Salvación: tu Rango personal.</p>`)}
+
+    ${tarjeta('tiradas', 'Últimas tiradas',
+      (pj.historial || []).length ? pj.historial.slice(0, 15).map(h => `<div class="hist"><span>${esc(h.t)}<small>${esc(h.d)}</small></span><b>${esc(h.total)}</b></div>`).join('') : '<p class="vacio">Aún no has tirado.</p>')}
+    <div class="fila-btn">
+      <button class="btn fino" data-acc="editar-ficha">${ico('lapiz')}Editar</button>
+      <button class="btn fino" data-acc="exportar-uno">${ico('copia')}Exportar</button>
+      <button class="btn fino peligro" data-acc="borrar-pj">${ico('basura')}Borrar</button>
+    </div>`;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -875,7 +667,7 @@ function dlgObjeto(donde) {
         <label class="campo"><span>Rango</span><select data-f="rango">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${+it.rango === n ? 'selected' : ''}>${R(n)}</option>`).join('')}</select></label>
         <label class="campo"><span>Rareza</span><select data-f="rareza">${Object.entries(RAREZAS).map(([k, v]) => `<option value="${k}" ${it.rareza === k ? 'selected' : ''}>${v.nombre}</option>`).join('')}</select></label>
       </div>
-      ${it.ranura !== 'otro' ? `
+      ${it.ranura !== 'otro' && (it.rareza !== 'comun' || it.props.length) ? `
       <div class="campo"><span>Propiedades${rz.props ? ` · ${rz.nombre}: ${rz.props}` : ''}</span>
         <div class="props-lista">${props || '<p class="leyenda">Sin propiedades.</p>'}</div>
         <button class="btn fino" data-dlg="prop-mas">${ico('mas')}Propiedad</button></div>
@@ -1081,7 +873,7 @@ function asistente() {
       html = `<div class="opciones">${Object.entries(CLASES).map(([k, cl]) => `
         <button class="opcion${pj.clase === k ? ' on' : ''}" data-dlg="clase" data-k="${k}">
           <span class="opcion-n">${esc(cl.nombre)}<small>${cl.pv} PV · ${ESCALERA[cl.dado]} · ${esc(cl.recurso.nombre)}</small></span>
-          <span class="opcion-t">${esc(cl.resumen)} Atributo principal: ${NOMBRE_ATR[cl.principal]}. Armadura: ${cl.armadura.length ? cl.armadura.join(', ') : 'ninguna'}${cl.escudo ? ' + escudo' : ''}.</span></button>`).join('')}</div>`;
+          <span class="opcion-t">${esc(cl.resumen)} Atributo principal: ${NOMBRE_ATR[cl.principal]}. Armadura: ${cl.armadura.length ? cl.armadura.join(', ') : 'ninguna'}${cl.escudos.length > 1 ? ' + cualquier escudo' : cl.escudo ? ' + escudo estándar' : ''}.</span></button>`).join('')}</div>`;
     } else if (p === 3) {
       html = `<div class="opciones">${Object.entries(PROFESIONES).map(([k, pr]) => `
         <button class="opcion${pj.profesion === k ? ' on' : ''}" data-dlg="prof" data-k="${k}">
@@ -1097,7 +889,7 @@ function asistente() {
         <label class="campo"><span>Arma</span><select id="as_arma">${armas.map(k => `<option value="${k}" ${st.arma === k ? 'selected' : ''}>${esc(TIPOS_ARMA[k])}</option>`).join('')}</select></label>
         <label class="campo"><span>Nombre del arma</span><input type="text" id="as_armanom" value="${esc(st.armaNom || NOM_ARMA[st.arma])}"></label>
         <label class="campo"><span>Armadura</span><select id="as_armadura">${arms.map(a => `<option value="${a.id}" ${st.armadura === a.id ? 'selected' : ''}>${esc(a.nombre)}${a.valor ? ` (Armadura ${a.valor})` : ''}</option>`).join('')}</select></label>
-        ${cl.escudo ? `<label class="marca"><input type="checkbox" id="as_escudo" ${st.escudo ? 'checked' : ''}> Escudo estándar (Guardia +1, Bloqueo +2)</label>` : ''}
+        ${cl.escudo ? `<label class="marca"><input type="checkbox" id="as_escudo" ${st.escudo ? 'checked' : ''}> Escudo estándar (Guardia +1, +2 al bloquear)</label>` : ''}
         <button class="btn" data-dlg="tirar-oro">${ico('d20')}${st.oroTirado ? `Oro: ${pj.oro} (${st.oroTirado.join(' + ')} × 10)` : 'Tirar 3d6 × 10 de oro'}</button>`;
     } else {
       html = `<label class="campo"><span>Nombre</span><input type="text" id="as_nom" value="${esc(pj.nombre)}" placeholder="Durn, Selen, Vess…"></label>
@@ -1237,7 +1029,7 @@ function dlgAjustes() {
     titulo: 'Ajustes',
     cuerpo: `<div class="campo"><span>Tamaño de letra</span>
       <div class="seg">${ops.map(([k, n]) => `<button data-dlg="letra" data-k="${k}" class="${actual === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
-      <p class="leyenda">Armisticio Companion · Manual de Prueba v0.1. Todo se guarda en este dispositivo.</p>`,
+      <p class="leyenda">Umbral · Armisticio, Manual Oficial v1.0. Todo se guarda en este dispositivo.</p>`,
     onClick: (a, btn) => {
       if (a !== 'letra') return;
       try { localStorage.setItem('arm_letra', btn.dataset.k); } catch (e) { /* sin almacenamiento */ }
@@ -1280,8 +1072,9 @@ function abrirPj(id) {
   const pj = Almacen.obtener(id);
   if (!pj) { aviso('No se encontró el personaje', 'mal'); return; }
   App.pj = Almacen.normalizar(pj);
-  App.pag = 'personaje';
-  App.rival = { rango: 0, cd: '' };
+  App.pag = 'ficha';
+  // Una sesión nueva: si pasaron más de 6 horas, vuelve el «repetir» humano
+  if (Date.now() - (App.pj.editado || 0) > 6 * 3600 * 1000) App.pj.repeticionUsada = false;
   Almacen.activo(id);
   render();
   window.scrollTo(0, 0);
@@ -1292,9 +1085,9 @@ const ACC = {
   nuevo: () => asistente(),
   pregenerados: () => abrirDlg({
     titulo: 'Pregenerados',
-    cuerpo: `<p class="nota">Cuatro personajes de nivel 1, uno por clase, listos para jugar.</p><div class="opciones">${PREGENERADOS.map((g, i) => `
+    cuerpo: `<div class="opciones">${PREGENERADOS.map((g, i) => `
       <button class="opcion" data-dlg="pre" data-i="${i}"><span class="opcion-n">${esc(g.nombre)}<small>${esc(CLASES[g.clase].nombre)}</small></span>
-      <span class="opcion-t">${esc(RAZAS[g.raza].nombre)} · ${esc(PROFESIONES[g.profesion].nombre)}. ${esc(g.motivo)}</span></button>`).join('')}</div>`,
+      <span class="opcion-t">${esc(RAZAS[g.raza].nombre)} · ${esc(PROFESIONES[g.profesion].nombre)}</span></button>`).join('')}</div>`,
     onClick: (a, btn) => { if (a === 'pre') crearPregenerado(+btn.dataset.i); },
   }),
   importar: () => $('archivo').click(),
@@ -1302,33 +1095,24 @@ const ACC = {
   abrir: b => abrirPj(b.dataset.id),
   retrato: () => $('retrato_in')?.click(),
   pv: b => cambio(() => { const c = calc(); App.pj.pv = Motor.clamp(pvActual(c) + (+b.dataset.d), 0, c.pvMax); }),
-  dano: () => dlgDano(),
-  curar: () => dlgCurar(),
   rec: b => ajustarRecurso(+b.dataset.d),
   'rec-usar': () => usarRecurso(),
-  prueba: b => tiradaPrueba(b.dataset.a),
-  salva: b => tiradaSalvacion(b.dataset.a),
   hitos: b => cambio(() => { App.pj.hitos = Math.max(0, (+App.pj.hitos || 0) + (+b.dataset.d)); }),
   subir: () => dlgSubirNivel(),
   'elegir-hab': () => dlgElegirHabilidad(),
-  vent: b => { App.vent = +b.dataset.v; render(); },
-  ataque: b => tiradaAtaque(b.dataset.t),
-  'dano-tirar': () => tiradaDano(),
-  'dano-rec': () => tiradaDano({ conRecurso: true }),
-  'dano-embosc': () => tiradaDano({ emboscada: true }),
-  defensa: () => tiradaDefensa(),
-  bloqueo: () => tiradaBloqueo(),
-  iniciativa: () => tiradaIniciativa(),
-  huir: () => tiradaHuir(),
+  prueba: b => tirar(cfgPrueba(b.dataset.a)),
+  salva: b => tirar(cfgSalvacion(b.dataset.a)),
+  ataque: b => tirar(cfgAtaque(b.dataset.t)),
+  dano: () => tiradaDano(),
+  bloqueo: () => tirar(cfgBloqueo()),
+  iniciativa: () => tirar(cfgIniciativa()),
   'nuevo-combate': () => nuevoCombate(),
-  'nueva-ronda': () => { cambio(() => { App.pj.reaccion = false; }); aviso('Nueva ronda: Reacción disponible'); },
+  descansar: () => dlgDescansar(),
   fuera: () => dlgFueraCombate(),
-  descanso: b => descansar(b.dataset.id),
   slot: b => dlgObjeto({ slot: b.dataset.r }),
   'inv-nuevo': () => dlgObjeto({ nuevoInv: true }),
   'inv-editar': b => dlgObjeto({ inv: +b.dataset.i }),
   'inv-equipar': b => equiparDesdeMochila(+b.dataset.i),
-  bolsas: () => pedirNumero('Ranuras extra por bolsas', App.pj.ranurasExtra || 0, v => cambio(() => { App.pj.ranurasExtra = v; })),
   cons: b => cambio(() => { const k = b.dataset.k; App.pj.consumibles[k] = Math.max(0, (+App.pj.consumibles[k] || 0) + (+b.dataset.d)); }),
   'cons-num': b => pedirNumero(CONSUMIBLES[b.dataset.k].nombre, +App.pj.consumibles[b.dataset.k] || 0, v => cambio(() => { App.pj.consumibles[b.dataset.k] = v; })),
   'pocion-rango': () => cambio(() => { App.pj.pocionRango = (App.pj.pocionRango || 1) % 8 + 1; }),
@@ -1338,9 +1122,8 @@ const ACC = {
     const baja = t.total <= 2;
     const nuevo = baja ? v - 1 : v;
     cambio(() => { App.pj.usos[k] = nuevo >= 0 ? nuevo : null; });
-    mostrarSimple({ titulo: `Usar ${DADOS_USO[k].nombre.toLowerCase()}`, formula: `Dado de Uso ${ESCALERA[v]}`, dados: t.dados, total: t.total,
-      veredicto: baja ? `<span class="veredicto mal">${nuevo < 0 ? 'Se acaban' : 'Baja a ' + ESCALERA[nuevo]}</span>` : '<span class="veredicto ok">Aguantan</span>',
-      notas: [baja ? (nuevo < 0 ? 'Te quedas a oscuras.' : 'Con 1 o 2 baja un escalón.') : 'Con 1 o 2 habría bajado un escalón.'] });
+    mostrarSimple({ titulo: DADOS_USO[k].nombre, formula: `Dado de Uso ${ESCALERA[v]}`, dados: t.dados, total: t.total,
+      veredicto: baja ? `<span class="veredicto mal">${nuevo < 0 ? 'Se acaban' : 'Baja a ' + ESCALERA[nuevo]}</span>` : '<span class="veredicto ok">Aguantan</span>' });
   },
   'uso-nuevo': b => cambio(() => { App.pj.usos[b.dataset.k] = DADOS_USO[b.dataset.k].nuevo; }),
   mat: b => cambio(() => {
@@ -1350,11 +1133,8 @@ const ACC = {
   }),
   'mat-nuevo': () => dlgMaterial(null),
   oro: () => pedirNumero('Oro', +App.pj.oro || 0, v => cambio(() => { App.pj.oro = v; }), { operaciones: true }),
-  recolectar: () => dlgRecolectar(),
-  fabricar: () => dlgFabricar(),
   'herida-borrar': b => cambio(() => { App.pj.heridas.splice(+b.dataset.i, 1); }),
   'editar-ficha': () => dlgEditarFicha(),
-  'nueva-sesion': () => { cambio(() => { App.pj.repeticionUsada = false; }); aviso('Nueva sesión'); },
   'exportar-uno': () => {
     const blob = new Blob([JSON.stringify(App.pj, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -1383,14 +1163,10 @@ document.addEventListener('click', e => {
     const t = App._tirada;
     $('velo_tirada').hidden = true;
     if (a === 'cerrar') return;
-    if (a === 'humano') {
-      App.pj.repeticionUsada = true; guardar();
-      const r = t.res;
-      tirarD20({ ...r, notas: (r.notas || []).concat(['Rasgo humano: repetida (una vez por sesión).']) });
-      return;
-    }
+    if (a === 'v1' || a === 'v-1') { tirar(t.cfg, a === 'v1' ? 1 : -1); return; }
+    if (a === 'humano') { App.pj.repeticionUsada = true; guardar(); tirar(t.cfg); return; }
     const acc = t.acciones[+a];
-    acc && acc.fn(t.res);
+    acc && acc.fn();
     return;
   }
   if (e.target === $('velo_tirada')) { $('velo_tirada').hidden = true; return; }
@@ -1406,10 +1182,6 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (App._dlgChange && $('dlg').contains(el)) { App._dlgChange(e); return; }
-  if (el.dataset.rival) {
-    App.rival[el.dataset.rival] = el.dataset.rival === 'rango' ? +el.value : el.value;
-    return;
-  }
   if (el.dataset.campo && App.pj) { App.pj[el.dataset.campo] = el.value; guardar(); }
   if (el.id === 'retrato_in' && el.files[0]) { cargarRetrato(el.files[0]); el.value = ''; return; }
   if (el.id === 'archivo' && el.files[0]) {

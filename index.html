@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0a0807">
-<meta name="description" content="Ficha de personaje para Armisticio, juego de rol de fantasía oscura.">
-<title>Armisticio</title>
+<meta name="theme-color" content="#070b1c">
+<meta name="description" content="Umbral: ficha de personaje para Armisticio, juego de rol de fantasía oscura.">
+<title>Umbral</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icono-apple-180.png">
@@ -44,8 +44,8 @@
 <header class="barra" id="barra">
   <button class="barra-btn" id="btn_atras" aria-label="Volver a los personajes" hidden><svg class="ico"><use href="#i-atras"/></svg></button>
   <div class="barra-titulo">
-    <span class="barra-nombre" id="barra_nombre">Armisticio</span>
-    <span class="barra-sub" id="barra_sub">Ficha de personaje</span>
+    <span class="barra-nombre" id="barra_nombre">Umbral</span>
+    <span class="barra-sub" id="barra_sub">Ficha para Armisticio</span>
   </div>
   <button class="barra-btn" id="btn_ajustes" aria-label="Ajustes"><svg class="ico"><use href="#i-ajustes"/></svg></button>
 </header>
@@ -53,18 +53,16 @@
 <main id="main">
   <section class="pantalla" id="pantalla_inicio"></section>
   <section class="pantalla" id="pantalla_ficha" hidden>
-    <div class="pagina" id="pag_personaje"></div>
-    <div class="pagina" id="pag_combate" hidden></div>
+    <div class="pagina" id="pag_ficha"></div>
     <div class="pagina" id="pag_equipo" hidden></div>
-    <div class="pagina" id="pag_diario" hidden></div>
+    <div class="pagina" id="pag_notas" hidden></div>
   </section>
 </main>
 
 <nav class="pestanas" id="pestanas" hidden aria-label="Secciones de la ficha">
-  <button class="pest activa" data-pag="personaje"><svg class="ico"><use href="#i-persona"/></svg><span>Personaje</span></button>
-  <button class="pest" data-pag="combate"><svg class="ico"><use href="#i-espada"/></svg><span>Combate</span></button>
+  <button class="pest activa" data-pag="ficha"><svg class="ico"><use href="#i-persona"/></svg><span>Ficha</span></button>
   <button class="pest" data-pag="equipo"><svg class="ico"><use href="#i-mochila"/></svg><span>Equipo</span></button>
-  <button class="pest" data-pag="diario"><svg class="ico"><use href="#i-diario"/></svg><span>Diario</span></button>
+  <button class="pest" data-pag="notas"><svg class="ico"><use href="#i-diario"/></svg><span>Notas</span></button>
 </nav>
 
 <!-- Resultado de una tirada -->

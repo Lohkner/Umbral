@@ -1,14 +1,14 @@
 {
-  "name": "Armisticio — Ficha de personaje",
-  "short_name": "Armisticio",
+  "name": "Umbral — Ficha para Armisticio",
+  "short_name": "Umbral",
   "description": "Ficha de personaje para Armisticio, juego de rol de fantasía oscura.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0807",
-  "theme_color": "#0a0807",
+  "background_color": "#070b1c",
+  "theme_color": "#070b1c",
   "icons": [
     {
       "src": "icons/icono-192.png",

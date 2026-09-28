@@ -1,6 +1,6 @@
 /* Service worker: la app entera queda en caché y funciona sin conexión.
    Al añadir o quitar archivos de APP_SHELL, sube CACHE_VERSION. */
-const CACHE_VERSION = 'armisticio-v4';
+const CACHE_VERSION = 'umbral-v1';
 const APP_SHELL = [
   './',
   './index.html',
