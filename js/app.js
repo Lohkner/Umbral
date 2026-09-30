@@ -207,6 +207,10 @@ function apuntar(titulo, total, detalle) {
 /* ── Qué se tira ────────────────────────────────────────────── */
 const NOM_ATAQUE = { cac: 'Cuerpo a cuerpo', dist: 'A distancia', magia: 'Mágico' };
 function cfgPrueba(a) { const c = calc(); return { titulo: `Prueba de ${NOMBRE_ATR[a]}`, mod: c.mods[a] }; }
+function cfgHabilidad(id) {
+  const h = calc().habs.find(x => x.id === id);
+  return { titulo: h.nombre, mod: h.mod };
+}
 function cfgSalvacion(a) {
   const c = calc();
   return { titulo: `Salvación de ${NOMBRE_ATR[a]}`, mod: c.mods[a] + c.comp,
@@ -490,7 +494,7 @@ function pintarInicio() {
 /* ── Tarjetas plegables ─────────────────────────────────────────
    Recuerdan si quedaron abiertas (preferencia de quien juega, aparte en
    arm_folds). Plegadas enseñan una línea de resumen. */
-const FOLDS_POR_DEFECTO = { habilidades: false, tiradas: false, referencia: false };
+const FOLDS_POR_DEFECTO = { aptitudes: false, tiradas: false, referencia: false };
 function foldAbierta(id) {
   try { const p = JSON.parse(localStorage.getItem('arm_folds')) || {}; if (id in p) return !!p[id]; } catch (e) { /* sin almacenamiento */ }
   return id in FOLDS_POR_DEFECTO ? FOLDS_POR_DEFECTO[id] : true;
@@ -511,7 +515,7 @@ function pintarFicha(c) {
   const colorRec = { Furia: 'var(--furia)', Combo: 'var(--combo)', Maná: 'var(--mana)', Fe: 'var(--fe)' }[rec.nombre];
   const tramos = ESCALERA.slice(0, rec.maxIdx + 1).map((e, i) => `<i class="${i <= ri ? 'lleno' : ''}"></i>`).join('');
   const puedeSubir = pj.hitos >= c.hitosNecesarios && c.nivel < 10;
-  const habPend = NIVELES_HABILIDAD.filter(n => c.nivel >= n).length - pj.habilidades.length;
+  const aptPend = NIVELES_APTITUD.filter(n => c.nivel >= n).length - pj.aptitudes.length;
 
   // Casillas de tirada: lo que se usa en cada combate
   // Una sola tirada, la de combate, para atacar y para bloquear (v1.0)
@@ -540,7 +544,7 @@ function pintarFicha(c) {
         <button class="pm" style="--c:var(--titulo)" data-acc="hitos" data-d="1" aria-label="Sumar un hito">+</button>
       </div>
       ${puedeSubir ? `<button class="btn prim ancho" data-acc="subir">Subir a nivel ${c.nivel + 1}</button>` : ''}
-      ${habPend > 0 ? `<button class="btn ancho" data-acc="elegir-hab">Elegir habilidad nueva</button>` : ''}
+      ${aptPend > 0 ? `<button class="btn ancho" data-acc="elegir-apt">Elegir aptitud nueva</button>` : ''}
       <input type="file" id="retrato_in" accept="image/*" hidden>
     </div>
 
@@ -576,15 +580,23 @@ function pintarFicha(c) {
 
 function pintarEstadisticas(c) {
   const pj = App.pj;
-  const habs = c.cl.habilidades.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
-  pj.habilidades.forEach(id => {
+  const apts = c.cl.aptitudes.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
+  pj.aptitudes.forEach(id => {
     for (const est of ESTILOS[pj.clase] || []) {
-      const h = est.hab.find(x => x[0] === id);
-      if (h) habs.push(`<div class="hab"><div class="hab-n">${esc(h[1])}</div><div class="hab-t">${esc(h[2])}</div></div>`);
+      const h = est.apt.find(x => x[0] === id);
+      if (h) apts.push(`<div class="hab"><div class="hab-n">${esc(h[1])}</div><div class="hab-t">${esc(h[2])}</div></div>`);
     }
   });
-  c.efectos.forEach(e => habs.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
-  if (c.resist.length) habs.push(`<div class="hab"><div class="hab-t">Resistencia: ventaja al resistir ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
+  c.efectos.forEach(e => apts.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
+  if (c.resist.length) apts.push(`<div class="hab"><div class="hab-t">Resistencia: ventaja al resistir ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
+
+  // Habilidades: se toca una y se tira la prueba. Las entrenadas, marcadas y ya con la Competencia.
+  const habs = c.habs.map(h => `
+    <button class="habb${h.entrenada ? ' entrenada' : ''}" data-acc="habilidad" data-h="${h.id}" aria-label="Prueba de ${esc(h.nombre)}${h.entrenada ? ', entrenada' : ''}">
+      <span class="habb-n">${esc(h.nombre)}</span>
+      <span class="habb-v">${S(h.mod)}</span>
+      <span class="habb-s">${h.atr}${h.entrenada ? ' · entrenada' : ''}</span>
+    </button>`).join('');
 
   $('pag_estadisticas').innerHTML = `
     ${tarjeta('atributos', 'Atributos', `
@@ -599,7 +611,10 @@ function pintarEstadisticas(c) {
         </div>`).join('')}
       </div>`, { peek: ATRIBUTOS.map(a => `${a[0]} ${S(c.mods[a])}`).join(' · ') })}
 
-    ${tarjeta('habilidades', 'Habilidades', habs.join(''), { peek: `${habs.length}` })}`;
+    ${tarjeta('pericias', 'Habilidades', `<div class="habbs">${habs}</div>`,
+      { peek: c.habs.filter(h => h.entrenada).map(h => `${esc(h.nombre)} ${S(h.mod)}`).join(' · ') })}
+
+    ${tarjeta('aptitudes', 'Aptitudes', apts.join(''), { peek: `${apts.length}` })}`;
 }
 
 const ICO_RANURA = { arma: 'espada', armadura: 'armadura', escudo: 'escudo', amuleto: 'amuleto', anillo1: 'anillo', anillo2: 'anillo' };
@@ -695,6 +710,7 @@ function pintarNotas() {
     ${tarjeta('referencia', 'Referencia rápida', `
       <div class="ref">
         <div><b>Prueba</b><span>d20 + atributo</span><em>CD de la tarea</em></div>
+        <div><b>Habilidad entrenada</b><span>d20 + atributo + Comp.</span><em>CD de la tarea</em></div>
         <div><b>Salvación</b><span>d20 + atributo + Comp.</span><em>CD del peligro</em></div>
         <div><b>Iniciativa</b><span>d20 + Destreza</span><em>CD 12</em></div>
         <div><b>Atacar</b><span>d20 + Combate</span><em>Guardia del objetivo</em></div>
@@ -867,7 +883,7 @@ function dlgMaterial(i, pre) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SUBIR DE NIVEL Y HABILIDADES
+   SUBIR DE NIVEL Y APTITUDES
 ══════════════════════════════════════════════════════════════ */
 function dlgSubirNivel() {
   const pj = App.pj;
@@ -887,9 +903,9 @@ function dlgSubirNivel() {
   lineas.push(`<div class="contador"><span class="contador-n"><b>Vida</b><small>${c.cl.vida}: sacas ${vida.total}${vida.total < mitad ? `, menos de la mitad: sumas ${mitad}` : ''}</small></span><span class="contador-v" style="color:var(--ok)">+${ganaPv}</span></div>`);
   subidas.forEach(s => lineas.push(`<div class="contador"><span class="contador-n"><b>${NOMBRE_ATR[s.a]} ${s.valor}</b><small>d20: ${s.t}${s.sube ? ' — mayor: sube 1' : ' — no sube'}</small></span><span class="contador-v" style="color:${s.sube ? 'var(--ok)' : 'var(--muted)'}">${s.sube ? '+1' : '—'}</span></div>`));
   const extras = [];
-  if (COMPETENCIA[nuevo] > c.comp) extras.push(`Competencia ${S(COMPETENCIA[nuevo])}: suben tu Ataque, Guardia, Bloqueo, salvaciones y Armadura máxima.`);
+  if (COMPETENCIA[nuevo] > c.comp) extras.push(`Competencia ${S(COMPETENCIA[nuevo])}: suben tu Combate, tu Guardia, tus salvaciones, tus Habilidades entrenadas y tu Armadura máxima.`);
   if (RANGO_PERSONAL[nuevo] > c.rango) extras.push(`Rango personal ${R(RANGO_PERSONAL[nuevo])}.`);
-  if (NIVELES_HABILIDAD.includes(nuevo)) extras.push('Eliges una habilidad nueva de tu clase.');
+  if (NIVELES_APTITUD.includes(nuevo)) extras.push('Eliges una aptitud nueva de tu clase.');
   if (!c.recurso.sube && (nuevo === 5 || nuevo === 9)) extras.push(`Tu ${c.recurso.nombre} sube a ${nuevo === 5 ? 'd10' : 'd12'}.`);
   abrirDlg({
     titulo: `Nivel ${nuevo}`,
@@ -909,27 +925,27 @@ function dlgSubirNivel() {
       apuntar(`Nivel ${nuevo}`, `+${ganaPv} PV`, subidas.filter(s => s.sube).map(s => s.a).join(', ') || 'sin subidas de atributo');
       aviso(`¡Nivel ${nuevo}!`);
       vibrar([15, 50, 15, 50, 30]);
-      if (NIVELES_HABILIDAD.includes(nuevo)) setTimeout(dlgElegirHabilidad, 350);
+      if (NIVELES_APTITUD.includes(nuevo)) setTimeout(dlgElegirAptitud, 350);
     },
   });
 }
-function dlgElegirHabilidad() {
+function dlgElegirAptitud() {
   const pj = App.pj;
   const bloques = (ESTILOS[pj.clase] || []).map(est => `
     <div class="campo"><span>${esc(est.estilo)}${est.nota ? ` · ${esc(est.nota)}` : ''}</span>
-      <div class="opciones">${est.hab.map(([id, n, t]) => {
-        const ya = pj.habilidades.includes(id);
-        return `<button class="opcion${ya ? ' on' : ''}" data-dlg="hab" data-id="${id}" ${ya ? 'disabled' : ''}>
+      <div class="opciones">${est.apt.map(([id, n, t]) => {
+        const ya = pj.aptitudes.includes(id);
+        return `<button class="opcion${ya ? ' on' : ''}" data-dlg="apt" data-id="${id}" ${ya ? 'disabled' : ''}>
           <span class="opcion-n">${esc(n)}${ya ? ' <small>ya la tienes</small>' : ''}</span><span class="opcion-t">${esc(t)}</span></button>`;
       }).join('')}</div></div>`).join('');
   abrirDlg({
-    titulo: 'Habilidad nueva',
+    titulo: 'Aptitud nueva',
     cuerpo: `<p class="nota">Puedes especializarte en un estilo o mezclar.</p>${bloques}`,
     onClick: (a, btn) => {
-      if (a !== 'hab') return;
+      if (a !== 'apt') return;
       cerrarDlg();
-      cambio(() => pj.habilidades.push(btn.dataset.id));
-      aviso('Habilidad aprendida');
+      cambio(() => pj.aptitudes.push(btn.dataset.id));
+      aviso('Aptitud aprendida');
     },
   });
 }
@@ -939,7 +955,8 @@ function dlgElegirHabilidad() {
 ══════════════════════════════════════════════════════════════ */
 function asistente() {
   const pj = Almacen.nuevo();
-  const st = { paso: 0, tiradas: {}, sel: null, arma: 'cac', armaNom: '', armadura: 'cuero', escudo: false, oroTirado: null };
+  const st = { paso: 0, tiradas: {}, sel: null, arma: 'cac', armaNom: '', armadura: 'cuero', escudo: false, oroTirado: null, habClase: null, habSust: null };
+  const nomHab = id => HABILIDADES.find(h => h.id === id).nombre;
   const PASOS = ['Atributos', 'Raza', 'Clase', 'Profesión', 'Equipo', 'Dale vida'];
 
   const ARMAS_CLASE = { guerrero: ['cac', 'dos', 'dist'], picaro: ['cac', 'dist'], mago: ['foco'], clerigo: ['cac', 'foco'] };
@@ -970,10 +987,18 @@ function asistente() {
           <span class="opcion-n">${esc(cl.nombre)}<small>${cl.pv} PV · ${ESCALERA[cl.dado]} · ${esc(cl.recurso.nombre)}</small></span>
           <span class="opcion-t">${esc(cl.resumen)} Atributo principal: ${NOMBRE_ATR[cl.principal]}. Armadura: ${cl.armadura.length ? cl.armadura.join(', ') : 'ninguna'}${cl.escudos.length > 1 ? ' + cualquier escudo' : cl.escudo ? ' + escudo estándar' : ''}.</span></button>`).join('')}</div>`;
     } else if (p === 3) {
+      // Habilidades entrenadas: 1 de la clase y las 2 de la profesión (cap. 3)
+      const cl = CLASES[pj.clase], prof = PROFESIONES[pj.profesion];
+      if (!cl.entrena.includes(st.habClase)) st.habClase = cl.entrena[0];
+      const repite = prof.entrena.includes(st.habClase);
+      const libres = HABILIDADES.filter(h => h.id !== st.habClase && !prof.entrena.includes(h.id));
+      if (repite && !libres.some(h => h.id === st.habSust)) st.habSust = libres[0].id;
       html = `<div class="opciones">${Object.entries(PROFESIONES).map(([k, pr]) => `
         <button class="opcion${pj.profesion === k ? ' on' : ''}" data-dlg="prof" data-k="${k}">
           <span class="opcion-n">${esc(pr.nombre)}<small>${pr.atrR} / ${pr.atrF}</small></span>
-          <span class="opcion-t">Recolecta ${esc(pr.recolecta.toLowerCase())} en ${esc(pr.donde.toLowerCase())}. Fabrica ${esc(pr.fabrica.toLowerCase())}.</span></button>`).join('')}</div>`;
+          <span class="opcion-t">Recolecta ${esc(pr.recolecta.toLowerCase())} en ${esc(pr.donde.toLowerCase())}. Fabrica ${esc(pr.fabrica.toLowerCase())}. Entrena ${pr.entrena.map(nomHab).join(' y ')}.</span></button>`).join('')}</div>
+        <label class="campo"><span>Habilidad de tu clase</span><select id="as_hclase">${cl.entrena.map(id => `<option value="${id}" ${st.habClase === id ? 'selected' : ''}>${esc(nomHab(id))}</option>`).join('')}</select></label>
+        ${repite ? `<label class="campo"><span>Tu profesión ya la entrena: elige otra</span><select id="as_hsust">${libres.map(h => `<option value="${h.id}" ${st.habSust === h.id ? 'selected' : ''}>${esc(h.nombre)}</option>`).join('')}</select></label>` : ''}`;
     } else if (p === 4) {
       const cl = CLASES[pj.clase];
       const armas = ARMAS_CLASE[pj.clase];
@@ -997,6 +1022,8 @@ function asistente() {
     const d = $('dlg');
     d.querySelectorAll('[data-atr]').forEach(el => { pj.base[el.dataset.atr] = Motor.clamp(parseInt(el.value, 10) || 3, 3, 18); });
     if ($('as_hum')) pj.atrHumano = $('as_hum').value;
+    if ($('as_hclase')) st.habClase = $('as_hclase').value;
+    if ($('as_hsust')) st.habSust = $('as_hsust').value;
     if ($('as_arma')) st.arma = $('as_arma').value;
     if ($('as_armanom')) st.armaNom = $('as_armanom').value;
     if ($('as_armadura')) st.armadura = $('as_armadura').value;
@@ -1012,7 +1039,10 @@ function asistente() {
       cuerpo: vista(),
       pie: `${st.paso ? '<button class="btn" data-dlg="atras">Atrás</button>' : '<button class="btn" data-dlg="cerrar">Cancelar</button>'}
         <button class="btn prim" data-dlg="${ultimo ? 'fin' : 'sig'}">${ultimo ? 'Crear' : 'Siguiente'}</button>`,
-      onChange: e => { if (e.target.id === 'as_arma') { leer(); st.armaNom = NOM_ARMA[st.arma]; pintar(); } },
+      onChange: e => {
+        if (e.target.id === 'as_arma') { leer(); st.armaNom = NOM_ARMA[st.arma]; pintar(); }
+        if (e.target.id === 'as_hclase') { leer(); pintar(); }
+      },
       onClick: (a, btn, ev) => {
         if (a === 'sel-atr') {
           if (ev && ev.target.tagName === 'INPUT') return;   // escribir el número no selecciona
@@ -1040,6 +1070,7 @@ function asistente() {
           pj.equipo.arma = { ...objetoNuevo('arma'), nombre: st.armaNom || NOM_ARMA[st.arma], sub: st.arma };
           if (st.armadura !== 'ninguna') pj.equipo.armadura = { ...objetoNuevo('armadura'), nombre: ARMADURAS.find(x => x.id === st.armadura).nombre, sub: st.armadura };
           if (cl.escudo && st.escudo) pj.equipo.escudo = { ...objetoNuevo('escudo'), nombre: 'Escudo estándar', sub: 'estandar' };
+          pj.entrenadas = Motor.entrenadasIniciales(pj.clase, pj.profesion, st.habClase, st.habSust);
           pj.consumibles.raciones = 5;
           pj.usos.antorchas = DADOS_USO.antorchas.nuevo;
           if (pj.clase === 'picaro') pj.consumibles.flechas = 20;
@@ -1060,6 +1091,7 @@ function crearPregenerado(i) {
   const pj = Almacen.nuevo();
   Object.assign(pj, { nombre: g.nombre, raza: g.raza, atrHumano: g.atrHumano || 'FUE', clase: g.clase, profesion: g.profesion, motivo: g.motivo, oro: g.oro });
   pj.base = { ...g.base };
+  pj.entrenadas = [...g.entrenadas];
   pj.equipo.arma = { ...objetoNuevo('arma'), nombre: g.arma.nombre, sub: g.arma.sub };
   if (g.armadura !== 'ninguna') pj.equipo.armadura = { ...objetoNuevo('armadura'), nombre: ARMADURAS.find(a => a.id === g.armadura).nombre + ' común', sub: g.armadura };
   if (g.escudo) pj.equipo.escudo = { ...objetoNuevo('escudo'), nombre: 'Escudo estándar', sub: g.escudo };
@@ -1093,6 +1125,8 @@ function dlgEditarFicha() {
         <label class="campo"><span>Rango de profesión</span><input type="number" inputmode="numeric" id="e_prr" value="${esc(pj.profRango || 1)}"></label>
         <label class="campo"><span>Ajuste de PV máx.</span><input type="number" inputmode="numeric" id="e_pvx" value="${esc(pj.pvExtra || 0)}"></label>
       </div>
+      <div class="campo"><span>Habilidades entrenadas</span>
+        <div class="marcas">${HABILIDADES.map(h => `<label class="marca"><input type="checkbox" id="e_h_${h.id}" ${pj.entrenadas.includes(h.id) ? 'checked' : ''}> ${esc(h.nombre)}</label>`).join('')}</div></div>
       ${pj.retrato ? '<label class="marca"><input type="checkbox" id="e_sinret"> Quitar el retrato</label>' : ''}
       <p class="leyenda">Cambiar el nivel a mano no tira vida ni atributos: úsalo para corregir. Para subir, usa los hitos.</p>`,
     pie: '<button class="btn" data-dlg="cerrar">Cancelar</button><button class="btn prim" data-dlg="ok">Guardar</button>',
@@ -1102,7 +1136,8 @@ function dlgEditarFicha() {
         pj.nombre = $('e_nom').value.trim() || pj.nombre;
         pj.motivo = $('e_mot').value.trim();
         pj.raza = $('e_raza').value; pj.atrHumano = $('e_hum').value;
-        if (pj.clase !== $('e_clase').value) { pj.clase = $('e_clase').value; pj.habilidades = []; pj.recurso = null; }
+        if (pj.clase !== $('e_clase').value) { pj.clase = $('e_clase').value; pj.aptitudes = []; pj.recurso = null; }
+        pj.entrenadas = HABILIDADES.map(h => h.id).filter(id => $('e_h_' + id)?.checked);
         pj.profesion = $('e_prof').value;
         ATRIBUTOS.forEach(at => { pj.base[at] = Motor.clamp(parseInt($('e_' + at).value, 10) || 10, 3, 18); });
         pj.nivel = Motor.clamp(parseInt($('e_niv').value, 10) || 1, 1, 10);
@@ -1194,9 +1229,10 @@ const ACC = {
   'rec-usar': () => usarRecurso(),
   hitos: b => cambio(() => { App.pj.hitos = Math.max(0, (+App.pj.hitos || 0) + (+b.dataset.d)); }),
   subir: () => dlgSubirNivel(),
-  'elegir-hab': () => dlgElegirHabilidad(),
+  'elegir-apt': () => dlgElegirAptitud(),
   prueba: b => tirar(cfgPrueba(b.dataset.a)),
   salva: b => tirar(cfgSalvacion(b.dataset.a)),
+  habilidad: b => tirar(cfgHabilidad(b.dataset.h)),
   ataque: b => tirar(cfgAtaque(b.dataset.t)),
   dano: () => tiradaDano(),
   bloqueo: () => tirar(cfgBloqueo()),

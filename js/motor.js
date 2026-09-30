@@ -73,6 +73,21 @@ const Motor = (() => {
     return Math.min(n, it.rango || 1);
   }
 
+  /* Habilidades entrenadas al crear (cap. 3): 1 de la clase y las 2 de la
+     profesión. Si la profesión repite la de la clase, se elige otra
+     cualquiera (sustituta; si no se da, la primera libre). */
+  function entrenadasIniciales(clase, profesion, deClase, sustituta) {
+    const cl = CLASES[clase] || CLASES.guerrero;
+    const pr = PROFESIONES[profesion] || PROFESIONES.herrero;
+    const lista = [cl.entrena.includes(deClase) ? deClase : cl.entrena[0]];
+    pr.entrena.forEach(h => { if (!lista.includes(h)) lista.push(h); });
+    if (lista.length < 3) {
+      const libres = [...cl.entrena, ...HABILIDADES.map(h => h.id)].filter(h => !lista.includes(h));
+      lista.push(libres.includes(sustituta) ? sustituta : libres[0]);
+    }
+    return lista;
+  }
+
   /* ── Cálculo de la ficha ───────────────────────────────────── */
   function calcular(pj) {
     const cl = CLASES[pj.clase] || CLASES.guerrero;
@@ -105,6 +120,10 @@ const Motor = (() => {
       atr[a] = clamp((+pj.base?.[a] || 10) + bonus[a], 3, ATR_MAX);
       mods[a] = mod(atr[a]);
     });
+
+    // Habilidades: atributo, y Competencia si está entrenada
+    const entrenadas = new Set(pj.entrenadas || []);
+    const habs = HABILIDADES.map(h => ({ ...h, entrenada: entrenadas.has(h.id), mod: mods[h.atr] + (entrenadas.has(h.id) ? comp : 0) }));
 
     // Arma, escudo, armadura
     const arma = eq.arma || null;
@@ -215,7 +234,7 @@ const Motor = (() => {
     });
 
     return {
-      cl, nivel, comp, rango, atr, mods, bonus, fuentesAtr,
+      cl, nivel, comp, rango, atr, mods, bonus, fuentesAtr, habs,
       ataque, ataquePrincipal, guardia, guardiaDesprevenido, atrDef,
       armadura: armaduraRD, armaduraBruta: armBruta, armaduraMax: armMax, armData,
       bloqueo, pvMax, dado, dadoBase, escArma,
@@ -227,5 +246,5 @@ const Motor = (() => {
     };
   }
 
-  return { mod, signo, d, tirar, parse, maxDe, escalon, porRango, d20, calcular, ranurasDe, escalonesArma, clamp, engastes, gemas, tiene };
+  return { mod, signo, d, tirar, parse, maxDe, escalon, porRango, d20, calcular, entrenadasIniciales, ranurasDe, escalonesArma, clamp, engastes, gemas, tiene };
 })();

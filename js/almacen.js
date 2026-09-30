@@ -25,7 +25,7 @@ const Almacen = (() => {
       base: { FUE: 10, DES: 10, VIT: 10, MEN: 10 },
       nivel: 1, hitos: 0, pvNiveles: [], pv: null,
       recurso: null, reaccion: false, repeticionUsada: false,
-      habilidades: [],
+      aptitudes: [], entrenadas: [],
       equipo: { arma: null, armadura: null, escudo: null, amuleto: null, anillo1: null, anillo2: null },
       inventario: [], consumibles: { raciones: 0, flechas: 0, pociones: 0, portal: 0 },
       pocionRango: 1, usos: { antorchas: null, aceite: null },
@@ -64,7 +64,12 @@ const Almacen = (() => {
     r.equipo = Object.assign(nuevo().equipo, pj.equipo || {});
     r.consumibles = Object.assign(nuevo().consumibles, pj.consumibles || {});
     r.usos = Object.assign(nuevo().usos, pj.usos || {});
-    ['inventario', 'materiales', 'habilidades', 'heridas', 'historial', 'pvNiveles'].forEach(k => { if (!Array.isArray(r[k])) r[k] = []; });
+    // Antes del manual con Habilidades, las aptitudes se llamaban «habilidades»
+    if (!Array.isArray(pj.aptitudes) && Array.isArray(pj.habilidades)) r.aptitudes = pj.habilidades.slice();
+    delete r.habilidades;
+    // Fichas sin Habilidades entrenadas: las de su clase y profesión (se pueden cambiar al editar)
+    if (!Array.isArray(pj.entrenadas)) r.entrenadas = Motor.entrenadasIniciales(r.clase, r.profesion);
+    ['inventario', 'materiales', 'aptitudes', 'entrenadas', 'heridas', 'historial', 'pvNiveles'].forEach(k => { if (!Array.isArray(r[k])) r[k] = []; });
     return r;
   }
 

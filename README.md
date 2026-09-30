@@ -28,7 +28,9 @@ izquierda o derecha (cada una recuerda por dónde ibas):
 - **Estadísticas**:
   - **Atributos**: arriba se tira la Prueba y abajo la Salvación (ya con la
     Competencia sumada);
-  - **Habilidades**, plegada.
+  - **Habilidades**: las 13 del manual (Atletismo, Sigilo, Trato…). Se toca
+    una y se tira; las entrenadas van marcadas y ya suman la Competencia;
+  - **Aptitudes** de la clase, plegada.
 - **Equipo**: las 6 ranuras (rareza por colores; propiedades y gemas solo
   si el objeto no es común), la mochila con sus ranuras y las provisiones
   (oro, raciones, pociones, flechas, dosis de veneno, portales, antorchas y
@@ -52,7 +54,9 @@ aparecen cuando se detienen, así que el resultado no se adelanta. Con
 «reducir movimiento» se muestra directo.
 
 **Creación**: asistente de 6 pasos (cap. 4) o uno de los cuatro
-pregenerados.
+pregenerados. En el paso de Profesión se elige la Habilidad de la clase (y
+otra si la profesión ya la entrena). Las entrenadas se cambian en Notas →
+Editar.
 
 **Cálculo automático**: modificadores, Competencia, Rango personal,
 Guardia (Aguante), Armadura con su máximo, Bloqueo, dado de clase con los
@@ -70,6 +74,15 @@ hoja del Dominio. También un generador de botín.
 
 ## Cambios del Manual Oficial v1.0
 
+- **Habilidades** (cap. 3, revisión del 29-9-2026):
+  - son 13 áreas de entrenamiento, cada una con su atributo. Entrenada:
+    1d20 + atributo + Competencia; sin entrenar, 1d20 + atributo;
+  - la clase entrena 1 a elegir y la profesión 2; si repite, se elige
+    otra;
+  - lo que antes se llamaba «habilidades» de clase ahora son
+    **Aptitudes** (niveles 1, 3, 5, 7 y 9);
+  - los pregenerados traen sus Habilidades del manual, y las fichas
+    anteriores reciben las de su clase y profesión (se pueden cambiar).
 - **Combate**:
   - «Ataque» pasa a llamarse **Combate**, y la misma tirada sirve para
     atacar y para bloquear;
@@ -90,7 +103,7 @@ hoja del Dominio. También un generador de botín.
 - **Consumibles**: nueva **dosis de veneno**. El manual no dice cuánto
   ocupa, así que la app no le cuenta ranuras.
 - **Pregenerados**: iguales al manual (Combate, Guardia, Armadura, bloqueo).
-- **Referencia rápida** del cap. 15 en la pestaña Notas.
+- **Referencia rápida** del cap. 15 en la pestaña Notas, con la prueba de Habilidad entrenada.
 
 Las fichas y copias hechas antes de llamarse Umbral se siguen importando.
 

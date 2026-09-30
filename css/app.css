@@ -186,6 +186,21 @@ main{max-width:640px;margin:0 auto;padding:12px 12px calc(var(--nav) + var(--saf
 .atr-acc button{flex:1;min-height:38px;border-radius:8px;border:1px solid var(--rim2);font-size:var(--fs-xs);color:var(--dim);background:rgba(0,0,0,.2);font-family:var(--fb)}
 .atr-acc button:active{border-color:var(--oxido);color:var(--hueso)}
 
+/* ── Habilidades: se toca una y se tira la prueba ────────────── */
+.habbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.habb{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "s v";align-items:center;column-gap:6px;
+  min-height:56px;padding:7px 10px;border-radius:10px;border:1px solid var(--rim);background:var(--hondo);text-align:left;
+}
+.habb:active{border-color:var(--oxido);transform:scale(.97)}
+.habb-n{grid-area:n;font-size:var(--fs-md);color:var(--dim);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.habb-v{grid-area:v;font-family:var(--fn);font-weight:700;font-size:1.2rem;color:var(--dim)}
+.habb-s{grid-area:s;font-size:var(--fs-2xs);color:var(--muted);line-height:1.2;white-space:nowrap}
+.habb.entrenada{border-color:rgba(207,42,64,.55);box-shadow:inset 0 -2px 0 rgba(207,42,64,.35)}
+.habb.entrenada .habb-n,.habb.entrenada .habb-v{color:var(--hueso)}
+.habb.entrenada .habb-s{color:var(--oxido-b)}
+.marcas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px}
+
 /* ── Números de combate ─────────────────────────────────────── */
 .nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .num{

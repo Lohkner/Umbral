@@ -9,14 +9,32 @@ const ATRIBUTOS = ['FUE', 'DES', 'VIT', 'MEN'];
 const NOMBRE_ATR = { FUE: 'Fuerza', DES: 'Destreza', VIT: 'Vitalidad', MEN: 'Mente' };
 const DESC_ATR = {
   FUE: 'Atacar cuerpo a cuerpo, trepar, romper cosas, resistir un empujón, minería',
-  DES: 'Disparar, defenderse, esconderse, abrir cerraduras, esquivar trampas, actuar antes',
+  DES: 'Disparar, tu Guardia, esconderte, abrir cerraduras, esquivar trampas, actuar antes en combate',
   VIT: 'Resistir venenos, enfermedades, frío y cansancio',
-  MEN: 'Lanzar hechizos, resistir la magia y el miedo, orientarse, rastrear, convencer',
+  MEN: 'Lanzar hechizos, resistir la magia y el miedo, orientarte, rastrear, convencer a alguien',
 };
 
 /* Cap. 3 · Modificadores. Ojo: no hay +0; 9–11 da −1. */
 const TABLA_MOD = [[3, 5, -3], [6, 8, -2], [9, 11, -1], [12, 14, 1], [15, 17, 2], [18, 18, 3]];
 const ATR_MAX = 18;
+
+/* Cap. 3 · Habilidades: áreas de entrenamiento, cada una con su atributo.
+   Entrenada: 1d20 + atributo + Competencia. No entrenada: 1d20 + atributo. */
+const HABILIDADES = [
+  { id: 'atletismo',     nombre: 'Atletismo',      atr: 'FUE', txt: 'Trepar, nadar, saltar, empujar, forzar' },
+  { id: 'acrobacia',     nombre: 'Acrobacia',      atr: 'DES', txt: 'Mantener el equilibrio, caer bien, zafarse, huir' },
+  { id: 'sigilo',        nombre: 'Sigilo',         atr: 'DES', txt: 'Moverse sin ser visto ni oído, esconderse' },
+  { id: 'juego_manos',   nombre: 'Juego de manos', atr: 'DES', txt: 'Abrir cerraduras, desactivar trampas, robar, hacer trucos' },
+  { id: 'percepcion',    nombre: 'Percepción',     atr: 'MEN', txt: 'Notar, escuchar, vigilar, detectar emboscadas' },
+  { id: 'investigacion', nombre: 'Investigación',  atr: 'MEN', txt: 'Buscar pistas, deducir, examinar mecanismos' },
+  { id: 'supervivencia', nombre: 'Supervivencia',  atr: 'MEN', txt: 'Orientarse, rastrear, cazar, acampar' },
+  { id: 'naturaleza',    nombre: 'Naturaleza',     atr: 'MEN', txt: 'Plantas, animales, clima y terreno' },
+  { id: 'arcano',        nombre: 'Arcano',         atr: 'MEN', txt: 'Magia, runas y criaturas mágicas' },
+  { id: 'historia',      nombre: 'Historia',       atr: 'MEN', txt: 'Leyendas, ruinas, reinos y linajes' },
+  { id: 'religion',      nombre: 'Religión',       atr: 'MEN', txt: 'Dioses, ritos, muertos vivientes y demonios' },
+  { id: 'trato',         nombre: 'Trato',          atr: 'MEN', txt: 'Convencer, negociar, engañar, intimidar' },
+  { id: 'medicina',      nombre: 'Medicina',       atr: 'MEN', txt: 'Curar heridas, atender a un caído, reconocer venenos' },
+];
 
 /* Cap. 3 · Escala de dificultad */
 const CDS = [
@@ -52,7 +70,8 @@ const RAZAS = {
 };
 
 /* Cap. 4 · Clases. dado = índice en ESCALERA; vida = dado de vida por nivel.
-   recurso.inicio: índice de escalón al empezar (−1 = vacío). */
+   recurso.inicio: índice de escalón al empezar (−1 = vacío).
+   entrena: Habilidades entre las que se elige 1 (cap. 3). */
 const CLASES = {
   guerrero: {
     nombre: 'Guerrero', principal: 'FUE', pv: 10, vida: 'd10', dado: 2,
@@ -60,7 +79,8 @@ const CLASES = {
     recurso: { nombre: 'Furia', sube: true, inicio: 0, min: 0, max: 4,
       regla: 'Empieza cada combate en d4 y sube un escalón cada vez que recibes daño (hasta d12). Gastar Furia la baja un escalón; en d4 no se puede gastar.' },
     resumen: 'En primera línea: aguanta golpes y los devuelve. Sencillo y directo.',
-    habilidades: [
+    entrena: ['atletismo', 'supervivencia'],
+    aptitudes: [
       ['Aguante', 'Tu Guardia usa tu modificador de Vitalidad en lugar del de Destreza.'],
       ['Furia', 'Empieza cada combate en d4 y sube un escalón cada vez que recibes daño (hasta d12).'],
       ['Golpe Brutal', 'Cuando tu ataque hace daño, suma tu dado de Furia; después la Furia baja un escalón.'],
@@ -72,7 +92,8 @@ const CLASES = {
     recurso: { nombre: 'Combo', sube: true, inicio: -1, min: -1, max: 4,
       regla: 'Cada ataque tuyo que hace daño lo sube un escalón. Empieza vacío: el primero te da d4. Gastar el Combo lo vacía.' },
     resumen: 'Ágil y sigiloso: golpea donde duele o dispara desde lejos.',
-    habilidades: [
+    entrena: ['sigilo', 'acrobacia', 'juego_manos'],
+    aptitudes: [
       ['Combo', 'Cada ataque tuyo que hace daño lo sube un escalón. Empieza vacío: el primero te da d4.'],
       ['Eviscerar', 'Suma tu dado de Combo al daño y lo vacía.'],
       ['Emboscada', 'Si atacas sin que te hayan visto, haces el daño máximo del dado, sin tirarlo.'],
@@ -84,7 +105,8 @@ const CLASES = {
     recurso: { nombre: 'Maná', sube: false, inicio: 2, min: -1, max: 4,
       regla: 'Empieza en d8. Al usar un poder que cuesta Maná, tira el dado: con 1 o 2 baja un escalón; en d4, se agota hasta que descanses. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
     resumen: 'Hechizos devastadores, pero frágil. Pensar antes de actuar.',
-    habilidades: [
+    entrena: ['arcano', 'historia'],
+    aptitudes: [
       ['Descarga', 'Ataque mágico a distancia (Lejos): tirada de combate mágica contra la Guardia del objetivo. No gasta Maná.'],
       ['Nova de Escarcha', 'Cuesta Maná. Todos los enemigos Cerca: una tirada de combate mágica contra la Guardia más alta. Si la supera, todos reciben tu daño y quedan congelados un turno; si no, la mitad. No se puede bloquear.'],
     ],
@@ -95,89 +117,91 @@ const CLASES = {
     recurso: { nombre: 'Fe', sube: false, inicio: 2, min: -1, max: 4,
       regla: 'Empieza en d8. Al usar un poder que cuesta Fe, tira el dado: con 1 o 2 baja un escalón; en d4, se agota hasta que descanses. Se recupera con una noche de descanso. Sube a d10 en el nivel 5 y a d12 en el 9.' },
     resumen: 'Cura a sus compañeros y castiga a los muertos.',
-    habilidades: [
+    entrena: ['religion', 'medicina'],
+    aptitudes: [
       ['Sanar', 'Cuesta Fe. Un aliado Próximo recupera tu dado de clase en PV, más los escalones de tu símbolo sagrado.'],
       ['Luz Sagrada', 'Ataque con tu Combate mágico contra la Guardia del objetivo; ventaja contra muertos vivientes y demonios.'],
     ],
   },
 };
 
-/* Cap. 4 · Estilos: habilidades que se eligen en los niveles 3, 5, 7 y 9 */
-const NIVELES_HABILIDAD = [3, 5, 7, 9];
+/* Cap. 4 · Estilos: aptitudes que se eligen en los niveles 3, 5, 7 y 9 */
+const NIVELES_APTITUD = [3, 5, 7, 9];
 const ESTILOS = {
   guerrero: [
-    { estilo: 'Devastador', nota: 'arma a dos manos', hab: [
+    { estilo: 'Devastador', nota: 'arma a dos manos', apt: [
       ['torbellino', 'Torbellino', 'Gasta Furia; atacas a todos los enemigos que tengas Cerca.'],
       ['ejecutar', 'Ejecutar', 'Contra un enemigo con la mitad de sus PV o menos, haces daño máximo.'],
       ['sed_sangre', 'Sed de sangre', 'Con arma a dos manos, cada enemigo que abates sube tu Furia un escalón.'],
     ] },
-    { estilo: 'Baluarte', nota: 'arma y escudo', hab: [
+    { estilo: 'Baluarte', nota: 'arma y escudo', apt: [
       ['muro_escudos', 'Muro de escudos', 'Un aliado Cerca suma tu Armadura a la suya este turno (sin pasar de su máximo).'],
       ['provocacion', 'Provocación', 'Gasta Furia; hasta tu próximo turno, los enemigos Cerca solo pueden atacarte a ti.'],
       ['represalia', 'Represalia', 'Cuando bloqueas un ataque con escudo, el atacante recibe tu dado de Furia en daño.'],
     ] },
-    { estilo: 'Comunes', hab: [
+    { estilo: 'Comunes', apt: [
       ['carga', 'Carga', 'Te mueves hasta Próximo y atacas con ventaja.'],
       ['grito', 'Grito de guerra', 'Gasta Furia; los aliados Próximos tienen ventaja en su siguiente tirada.'],
     ] },
   ],
   picaro: [
-    { estilo: 'Sombra', nota: 'cuerpo a cuerpo y sigilo', hab: [
+    { estilo: 'Sombra', nota: 'cuerpo a cuerpo y sigilo', apt: [
       ['paso_sombrio', 'Paso sombrío', 'Apareces junto a un enemigo Próximo.'],
       ['veneno', 'Veneno', 'Gasta una dosis de veneno; tus próximos 3 golpes suman d4.'],
       ['golpe_bajo', 'Golpe bajo', 'Gasta el Combo; el enemigo pierde su siguiente ataque.'],
     ] },
-    { estilo: 'Tirador', nota: 'a distancia', hab: [
+    { estilo: 'Tirador', nota: 'a distancia', apt: [
       ['lluvia', 'Lluvia de flechas', 'Disparas a 3 objetivos a la vez; gasta 3 flechas.'],
       ['certero', 'Disparo certero', 'Tu siguiente disparo ignora la Armadura del objetivo.'],
       ['retirada', 'Retirada', 'Después de disparar, te mueves hasta Próximo sin que puedan atacarte.'],
     ] },
-    { estilo: 'Comunes', hab: [
+    { estilo: 'Comunes', apt: [
       ['evasion', 'Evasión', 'En las salvaciones de Destreza, si tienes éxito no recibes nada y si fallas recibes la mitad.'],
       ['ojo_ladron', 'Ojo de ladrón', 'Ventaja con cerraduras y trampas; siempre notas los cofres ocultos.'],
     ] },
   ],
   mago: [
-    { estilo: 'Piromante', nota: 'destrucción', hab: [
+    { estilo: 'Piromante', nota: 'destrucción', apt: [
       ['bola_fuego', 'Bola de Fuego', 'Cuesta Maná; como la Nova, pero Lejos y en una zona.'],
       ['combustion', 'Combustión', 'Cuesta Maná; tu siguiente hechizo hace daño máximo.'],
       ['muro_llamas', 'Muro de llamas', 'Cuesta Maná; una línea de fuego Próxima quema con tu dado de clase a quien la cruce, durante 3 turnos.'],
     ] },
-    { estilo: 'Arcanista', nota: 'control', hab: [
+    { estilo: 'Arcanista', nota: 'control', apt: [
       ['polimorfia', 'Polimorfia', 'Cuesta Maná; un enemigo con DG iguales o menores que tu nivel (o un personaje de nivel igual o menor) se convierte en oveja durante 3 turnos.'],
       ['parpadeo', 'Parpadeo', 'Te teletransportas hasta Próximo.'],
       ['contrahechizo', 'Contrahechizo', 'Cuesta Maná; un monstruo pierde su poder especial hasta el final del turno.'],
     ] },
-    { estilo: 'Comunes', hab: [
+    { estilo: 'Comunes', apt: [
       ['escudo_mana', 'Escudo de Maná', 'Al recibir daño, tira tu dado de Maná y réstalo del daño.'],
       ['elemental', 'Elemental', 'Cuesta Maná; invocas un aliado con DG iguales a la mitad de tu nivel, hasta el final del combate.'],
     ] },
   ],
   clerigo: [
-    { estilo: 'Misericordia', nota: 'curación', hab: [
+    { estilo: 'Misericordia', nota: 'curación', apt: [
       ['consagrar', 'Consagrar', 'Cuesta Fe; los aliados de la zona recuperan 1 PV por turno durante 3 turnos.'],
       ['escudo_luz', 'Escudo de Luz', 'Cuesta Fe; un aliado queda protegido y absorbe tu dado de Fe en daño.'],
       ['intercesion', 'Intercesión', 'Una vez por sesión, un aliado caído repite su tirada de Fuera de Combate.'],
     ] },
-    { estilo: 'Juicio', nota: 'combate', hab: [
+    { estilo: 'Juicio', nota: 'combate', apt: [
       ['martillo', 'Martillo sagrado', 'Cuando tu ataque cuerpo a cuerpo hace daño, gasta Fe y suma su dado al daño.'],
       ['expulsar', 'Expulsar', 'Los muertos vivientes con DG iguales o menores que tu nivel huyen.'],
       ['marca', 'Marca del juicio', 'Cuesta Fe; tus aliados atacan con ventaja al enemigo marcado hasta que caiga.'],
     ] },
-    { estilo: 'Comunes', hab: [
+    { estilo: 'Comunes', apt: [
       ['bendicion', 'Bendición', 'Cuesta Fe; tus aliados tienen +1 Armadura durante el combate (sin pasar de su máximo).'],
       ['vigilia', 'Plegaria de vigilia', 'Tras una noche de descanso contigo, tus aliados recuperan todos sus PV.'],
     ] },
   ],
 };
 
-/* Cap. 4 / 7 · Profesiones */
+/* Cap. 4 / 7 · Profesiones. entrena: sus 2 Habilidades (si repite la de
+   la clase, se elige otra cualquiera). */
 const PROFESIONES = {
-  herrero:    { nombre: 'Herrero', recolecta: 'Minería', atrR: 'FUE', donde: 'Colinas, montañas, minas', fabrica: 'Armas, armaduras y escudos; abre engastes', atrF: 'FUE', material: 'mineral' },
-  alquimista: { nombre: 'Alquimista', recolecta: 'Herboristería', atrR: 'MEN', donde: 'Bosques, pantanos', fabrica: 'Pociones', atrF: 'MEN', material: 'hierba' },
-  peletero:   { nombre: 'Peletero', recolecta: 'Desuello', atrR: 'DES', donde: 'Al vencer a bestias', fabrica: 'Armadura ligera y bolsas', atrF: 'DES', material: 'piel' },
-  joyero:     { nombre: 'Joyero', recolecta: 'Prospección', atrR: 'MEN', donde: 'Ríos, vetas, estanques', fabrica: 'Gemas, anillos y amuletos', atrF: 'DES', material: 'piedra en bruto' },
-  encantador: { nombre: 'Encantador', recolecta: 'Esencias', atrR: 'MEN', donde: 'Ruinas, menhires, lugares mágicos', fabrica: 'Encantamientos', atrF: 'MEN', material: 'esencia' },
+  herrero:    { nombre: 'Herrero', recolecta: 'Minería', atrR: 'FUE', donde: 'Colinas, montañas, minas', fabrica: 'Armas, armaduras y escudos; abre engastes', atrF: 'FUE', material: 'mineral', entrena: ['atletismo', 'investigacion'] },
+  alquimista: { nombre: 'Alquimista', recolecta: 'Herboristería', atrR: 'MEN', donde: 'Bosques, pantanos', fabrica: 'Pociones', atrF: 'MEN', material: 'hierba', entrena: ['naturaleza', 'medicina'] },
+  peletero:   { nombre: 'Peletero', recolecta: 'Desuello', atrR: 'DES', donde: 'Al vencer a bestias', fabrica: 'Armadura ligera y bolsas', atrF: 'DES', material: 'piel', entrena: ['supervivencia', 'naturaleza'] },
+  joyero:     { nombre: 'Joyero', recolecta: 'Prospección', atrR: 'MEN', donde: 'Ríos, vetas, estanques', fabrica: 'Gemas, anillos y amuletos', atrF: 'DES', material: 'piedra en bruto', entrena: ['juego_manos', 'percepcion'] },
+  encantador: { nombre: 'Encantador', recolecta: 'Esencias', atrR: 'MEN', donde: 'Ruinas, menhires, lugares mágicos', fabrica: 'Encantamientos', atrF: 'MEN', material: 'esencia', entrena: ['arcano', 'historia'] },
 };
 /* CD de fabricar según el Rango de lo que se fabrica */
 const CD_FABRICAR = [0, 12, 12, 14, 14, 16, 16, 18, 18];
@@ -290,17 +314,21 @@ const PREGENERADOS = [
   { nombre: 'Durn Martillo-Gris', raza: 'enano', clase: 'guerrero', profesion: 'herrero',
     base: { FUE: 14, DES: 9, VIT: 15, MEN: 10 }, motivo: 'Mi clan perdió su mina ante los muertos. Vengo a recuperarla.',
     arma: { nombre: 'Hacha común', sub: 'cac' }, armadura: 'malla', escudo: 'estandar',
+    entrenadas: ['atletismo', 'investigacion', 'percepcion'],
     consumibles: { raciones: 5 }, antorchas: 1, oro: 80, materiales: [{ nombre: 'Hierro', rango: 1, cantidad: 2 }] },
   { nombre: 'Selen Vareda', raza: 'elfo', clase: 'picaro', profesion: 'peletero',
     base: { FUE: 8, DES: 15, VIT: 11, MEN: 12 }, motivo: 'Busco fortuna en la frontera.',
     arma: { nombre: 'Arco corto común', sub: 'dist' }, armadura: 'cuero', escudo: null,
+    entrenadas: ['juego_manos', 'supervivencia', 'naturaleza'],
     consumibles: { raciones: 5, flechas: 20 }, antorchas: null, oro: 110, materiales: [{ nombre: 'Piel', rango: 1, cantidad: 1 }] },
   { nombre: 'Vess de la Segunda Tumba', raza: 'resucitado', clase: 'mago', profesion: 'encantador',
     base: { FUE: 7, DES: 12, VIT: 9, MEN: 16 }, motivo: 'Volví de la tumba y quiero saber por qué.',
     arma: { nombre: 'Varita común', sub: 'foco' }, armadura: 'ninguna', escudo: null,
+    entrenadas: ['arcano', 'historia', 'investigacion'],
     consumibles: { raciones: 5 }, antorchas: 1, oro: 60, materiales: [{ nombre: 'Esencia', rango: 1, cantidad: 1 }] },
   { nombre: 'Ottmar Brand', raza: 'humano', atrHumano: 'MEN', clase: 'clerigo', profesion: 'alquimista',
     base: { FUE: 11, DES: 10, VIT: 13, MEN: 14 }, motivo: 'Mi fe me trajo a la frontera, donde los muertos no descansan.',
     arma: { nombre: 'Maza común', sub: 'cac' }, armadura: 'escamas', escudo: 'estandar',
+    entrenadas: ['religion', 'naturaleza', 'medicina'],
     consumibles: { raciones: 5, pociones: 2 }, antorchas: null, oro: 90, materiales: [{ nombre: 'Hierba', rango: 1, cantidad: 2 }] },
 ];
