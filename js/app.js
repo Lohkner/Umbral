@@ -12,7 +12,7 @@ const ico = (id, cls = 'ico') => `<svg class="${cls}" aria-hidden="true"><use hr
 const S = Motor.signo;
 const R = n => ROMANO[n] || '—';
 
-const App = { pj: null, pag: 'ficha' };
+const App = { pj: null, pag: 'ficha', scroll: {} };
 
 /* ── Utilidades de interfaz ─────────────────────────────────── */
 function aviso(txt, tipo) {
@@ -143,13 +143,26 @@ function mostrarSimple({ titulo, formula, dados, total, notas = [], veredicto = 
 }
 
 /* ── El «roll» ──────────────────────────────────────────────────
-   Los dados giran cambiando de cara cada vez más despacio, se asientan
-   uno tras otro con un golpe, y solo entonces aparecen el total y los
-   botones: el resultado no se adelanta. Con «reducir movimiento» se
-   muestra directo. Se usa setTimeout y no requestAnimationFrame para que
-   funcione igual con la pestaña en segundo plano. */
+   El dado se queda quieto y es el número el que rueda dentro, como el
+   rodillo de una tragaperras: cada cara entra por arriba y la anterior
+   sale por abajo, cada vez más despacio. Los dados se asientan uno tras
+   otro y solo entonces aparecen el total y los botones: el resultado no
+   se adelanta. Con «reducir movimiento» se muestra directo. Se usa
+   setTimeout y no requestAnimationFrame para que funcione igual con la
+   pestaña en segundo plano. */
 function dadoRodando(valor, caras, clase) {
-  return `<span class="dado rodando" data-v="${valor}" data-caras="${caras}" data-c="${clase}">${1 + Math.floor(Math.random() * caras)}</span>`;
+  return `<span class="dado rodando" data-v="${valor}" data-caras="${caras}" data-c="${clase}"><span class="cara">${1 + Math.floor(Math.random() * caras)}</span></span>`;
+}
+function ponerCara(d, n, ms, clase = 'entra') {
+  d.querySelectorAll('.cara:not(.sale)').forEach(v => {
+    v.className = 'cara sale'; v.style.animationDuration = ms + 'ms';
+    setTimeout(() => v.remove(), ms);
+  });
+  const c = document.createElement('span');
+  c.className = 'cara ' + clase;
+  c.style.animationDuration = ms + 'ms';
+  c.textContent = n;
+  d.appendChild(c);
 }
 function rodar(vibracionFinal) {
   clearTimeout(App._rodarT);
@@ -157,14 +170,16 @@ function rodar(vibracionFinal) {
   const card = $('tirada');
   const dados = [...card.querySelectorAll('.dado[data-v]')];
   const res = card.querySelector('.tirada-res');
+  const directo = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const asentar = d => {
-    d.textContent = d.dataset.v;
+    if (directo) d.innerHTML = `<span class="cara">${d.dataset.v}</span>`;
+    else ponerCara(d, d.dataset.v, 300, 'asienta');
     d.classList.remove('rodando');
     d.classList.add('asentado');
     if (d.dataset.c) d.classList.add(d.dataset.c);
   };
   const mostrar = () => { res && res.classList.add('visible'); vibrar(vibracionFinal); };
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !dados.length) {
+  if (directo || !dados.length) {
     dados.forEach(asentar); mostrar(); return;
   }
   vibrar([6, 50, 6, 60, 6, 80, 6]);
@@ -172,7 +187,8 @@ function rodar(vibracionFinal) {
   let paso = 0;
   const tic = () => {
     if (token !== App._rodarToken) return;
-    dados.forEach(d => { if (d.classList.contains('rodando')) d.textContent = 1 + Math.floor(Math.random() * (+d.dataset.caras || 20)); });
+    const ms = esperas[Math.min(paso, esperas.length - 1)];
+    dados.forEach(d => { if (d.classList.contains('rodando')) ponerCara(d, 1 + Math.floor(Math.random() * (+d.dataset.caras || 20)), ms); });
     if (paso < esperas.length) { App._rodarT = setTimeout(tic, esperas[paso++]); return; }
     // se asientan de uno en uno
     dados.forEach((d, i) => setTimeout(() => { if (token === App._rodarToken) asentar(d); }, i * 110));
@@ -346,7 +362,7 @@ function nuevoCombate() {
 /* ══════════════════════════════════════════════════════════════
    PINTAR
 ══════════════════════════════════════════════════════════════ */
-const PAGINAS = ['ficha', 'equipo', 'notas'];
+const PAGINAS = ['ficha', 'estadisticas', 'equipo', 'notas'];
 function render() {
   const enFicha = !!App.pj;
   $('pantalla_inicio').hidden = enFicha;
@@ -366,8 +382,83 @@ function render() {
   $('barra_sub').textContent = `${RAZAS[pj.raza]?.nombre || ''} · ${c.cl.nombre} · Nivel ${c.nivel}`;
   document.querySelectorAll('.pest').forEach(b => b.classList.toggle('activa', b.dataset.pag === App.pag));
   PAGINAS.forEach(p => { $('pag_' + p).hidden = p !== App.pag; });
-  ({ ficha: pintarFicha, equipo: pintarEquipo, notas: pintarNotas })[App.pag](c);
+  ({ ficha: pintarFicha, estadisticas: pintarEstadisticas, equipo: pintarEquipo, notas: pintarNotas })[App.pag](c);
 }
+
+/* ── Cambiar de pestaña ─────────────────────────────────────────
+   Con la barra de abajo o deslizando el dedo. Cada pestaña recuerda
+   dónde se quedó, y la nueva entra desde el lado hacia el que se va. */
+function irA(pag, dir) {
+  if (pag === App.pag || !PAGINAS.includes(pag)) return;
+  App.scroll[App.pag] = window.scrollY;
+  dir = dir || (PAGINAS.indexOf(pag) > PAGINAS.indexOf(App.pag) ? 1 : -1);
+  App.pag = pag;
+  render();
+  window.scrollTo(0, App.scroll[pag] || 0);
+  const el = $('pag_' + pag);
+  if (el.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.animate([{ transform: `translateX(${dir * 22}%)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
+  }
+}
+
+/* Deslizar: la página sigue al dedo y, pasado un cuarto de pantalla (o
+   con un gesto rápido), cambia a la vecina. Solo gestos claramente
+   horizontales; el desplazamiento vertical queda intacto. */
+(() => {
+  const zona = $('pantalla_ficha');
+  let x0 = 0, y0 = 0, t0 = 0, modo = null, el = null;
+  const suelta = (e, ms) => {
+    if (!e) return;
+    e.style.transition = `transform ${ms}ms ease-out, opacity ${ms}ms ease-out`;
+    e.style.transform = ''; e.style.opacity = '';
+    setTimeout(() => { e.style.transition = ''; }, ms);
+  };
+  zona.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    modo = null; el = $('pag_' + App.pag);
+    // Varios dedos, campos de texto o los bordes (gestos del sistema): nada
+    if (e.touches.length > 1 || e.target.closest('input,textarea,select,[contenteditable]') ||
+        t.clientX < 18 || t.clientX > innerWidth - 18) { modo = 'no'; return; }
+    x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+  }, { passive: true });
+  zona.addEventListener('touchmove', e => {
+    if (modo === 'no') return;
+    const t = e.touches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (!modo) {
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      modo = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'h' : 'no';
+      if (modo === 'no') return;
+      el.style.transition = 'none';
+    }
+    const i = PAGINAS.indexOf(App.pag);
+    const hay = dx < 0 ? i < PAGINAS.length - 1 : i > 0;
+    el.style.transform = `translateX(${hay ? dx : dx / 5}px)`;   // en los extremos, se resiste
+    el.style.opacity = hay ? 1 - Math.min(Math.abs(dx) / innerWidth, 1) * .7 : '';
+  }, { passive: true });
+  const fin = e => {
+    const era = modo; modo = null;
+    if (era !== 'h') return;
+    const t = e.changedTouches[0];
+    const dx = (t ? t.clientX : x0) - x0;
+    const rapido = Math.abs(dx) > 45 && Date.now() - t0 < 280;
+    const i = PAGINAS.indexOf(App.pag);
+    const dest = Math.abs(dx) > innerWidth * .25 || rapido ? i + (dx < 0 ? 1 : -1) : i;
+    if (dest === i || dest < 0 || dest >= PAGINAS.length) { suelta(el, 200); return; }
+    const sale = el;
+    sale.style.transition = 'transform .12s ease-in, opacity .12s ease-in';
+    sale.style.transform = `translateX(${dx < 0 ? -40 : 40}%)`;
+    sale.style.opacity = '0';
+    vibrar(4);
+    setTimeout(() => {
+      sale.style.transition = ''; sale.style.transform = ''; sale.style.opacity = '';
+      irA(PAGINAS[dest], dx < 0 ? 1 : -1);
+    }, 120);
+  };
+  zona.addEventListener('touchend', fin);
+  zona.addEventListener('touchcancel', () => { if (modo === 'h') suelta(el, 200); modo = null; });
+})();
 
 function pintarInicio() {
   const lista = Almacen.lista();
@@ -434,16 +525,6 @@ function pintarFicha(c) {
   casillas.push({ n: 'Armadura', v: c.armadura, s: `máximo ${c.armaduraMax}` });
   casillas.push({ acc: 'iniciativa', n: 'Iniciativa', v: S(c.mods.DES), s: 'contra 12' });
 
-  const habs = c.cl.habilidades.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
-  pj.habilidades.forEach(id => {
-    for (const est of ESTILOS[pj.clase] || []) {
-      const h = est.hab.find(x => x[0] === id);
-      if (h) habs.push(`<div class="hab"><div class="hab-n">${esc(h[1])}</div><div class="hab-t">${esc(h[2])}</div></div>`);
-    }
-  });
-  c.efectos.forEach(e => habs.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
-  if (c.resist.length) habs.push(`<div class="hab"><div class="hab-t">Resistencia: ventaja al resistir ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
-
   $('pag_ficha').innerHTML = `
     ${c.avisos.map(a => `<div class="aviso-f">${esc(a)}</div>`).join('')}
     <div class="card portada">
@@ -490,8 +571,22 @@ function pintarFicha(c) {
       <div class="nums">${casillas.map(k => k.acc
         ? `<button class="num" data-acc="${k.acc}"${k.t ? ` data-t="${k.t}"` : ''}><span class="num-n">${k.n}</span><span class="num-v">${esc(k.v)}</span><span class="num-s">${esc(k.s)}</span></button>`
         : `<div class="num fijo"><span class="num-n">${k.n}</span><span class="num-v">${esc(k.v)}</span><span class="num-s">${esc(k.s)}</span></div>`).join('')}
-      </div>`, { peek: `Combate ${S(c.ataque[c.ataquePrincipal])} · Guardia ${c.guardia}` })}
+      </div>`, { peek: `Combate ${S(c.ataque[c.ataquePrincipal])} · Guardia ${c.guardia}` })}`;
+}
 
+function pintarEstadisticas(c) {
+  const pj = App.pj;
+  const habs = c.cl.habilidades.map(([n, t]) => `<div class="hab"><div class="hab-n">${esc(n)}</div><div class="hab-t">${esc(t)}</div></div>`);
+  pj.habilidades.forEach(id => {
+    for (const est of ESTILOS[pj.clase] || []) {
+      const h = est.hab.find(x => x[0] === id);
+      if (h) habs.push(`<div class="hab"><div class="hab-n">${esc(h[1])}</div><div class="hab-t">${esc(h[2])}</div></div>`);
+    }
+  });
+  c.efectos.forEach(e => habs.push(`<div class="hab"><div class="hab-t">${esc(e)}</div></div>`));
+  if (c.resist.length) habs.push(`<div class="hab"><div class="hab-t">Resistencia: ventaja al resistir ${esc(c.resist.map(r => RESISTENCIAS[r].toLowerCase()).join(', '))}.</div></div>`);
+
+  $('pag_estadisticas').innerHTML = `
     ${tarjeta('atributos', 'Atributos', `
       <div class="atrs">${ATRIBUTOS.map(a => `
         <div class="atr">
@@ -1072,7 +1167,7 @@ function abrirPj(id) {
   const pj = Almacen.obtener(id);
   if (!pj) { aviso('No se encontró el personaje', 'mal'); return; }
   App.pj = Almacen.normalizar(pj);
-  App.pag = 'ficha';
+  App.pag = 'ficha'; App.scroll = {};
   // Una sesión nueva: si pasaron más de 6 horas, vuelve el «repetir» humano
   if (Date.now() - (App.pj.editado || 0) > 6 * 3600 * 1000) App.pj.repeticionUsada = false;
   Almacen.activo(id);
@@ -1173,7 +1268,7 @@ document.addEventListener('click', e => {
   if (e.target === $('velo_dlg')) { cerrarDlg(); return; }
   // Pestañas
   const p = e.target.closest('.pest');
-  if (p) { App.pag = p.dataset.pag; render(); window.scrollTo(0, 0); return; }
+  if (p) { irA(p.dataset.pag); return; }
   // Acciones
   const b = e.target.closest('[data-acc]');
   if (b && ACC[b.dataset.acc]) { ACC[b.dataset.acc](b, e); }

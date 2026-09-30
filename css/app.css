@@ -59,7 +59,7 @@ input,select,textarea{font:inherit;color:var(--texto)}
 .barra-sub{font-family:var(--fb);font-style:italic;font-size:clamp(12px,.8125rem,13px);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 
 /* ── Páginas ────────────────────────────────────────────────── */
-main{max-width:640px;margin:0 auto;padding:12px 12px calc(var(--nav) + var(--safe-b) + 20px)}
+main{max-width:640px;margin:0 auto;padding:12px 12px calc(var(--nav) + var(--safe-b) + 20px);overflow-x:hidden;overflow-x:clip;touch-action:pan-y}
 .pagina{display:flex;flex-direction:column;gap:12px}
 
 /* ── Tarjetas ───────────────────────────────────────────────── */
@@ -270,8 +270,9 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   height:calc(var(--nav) + var(--safe-b));padding-bottom:var(--safe-b);
   background:linear-gradient(180deg,rgba(10,15,36,.96),rgba(6,9,24,.99));border-top:1px solid var(--rim);
 }
-.pest{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);position:relative}
-.pest span{font-family:var(--ft);font-size:clamp(12px,.75rem,12.5px);letter-spacing:.08em;text-transform:uppercase}
+.pest{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);position:relative}
+.pest span{font-family:var(--ft);font-size:12px;letter-spacing:.03em;white-space:nowrap;text-transform:uppercase}
+@media(max-width:374px){.pest span{letter-spacing:0}}
 .pest.activa{color:var(--titulo)}
 .pest.activa::before{content:'';position:absolute;top:-1px;left:22%;right:22%;height:2px;background:var(--titulo);box-shadow:0 0 10px var(--titulo)}
 
@@ -291,7 +292,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .dados{display:flex;justify-content:center;gap:10px;margin:14px 0 6px}
 .dado{width:52px;height:52px;display:grid;place-items:center;border-radius:12px;font-family:var(--fn);font-weight:700;font-size:1.35rem;
   border:1px solid var(--rim3);background:radial-gradient(circle at 40% 30%,#26386b,#0e1631 75%);color:var(--hueso)}
-.dado.descartado{opacity:.35;transform:scale(.88)}
+.dado.descartado{opacity:.35}
 .dado.crit{border-color:var(--r-raro);color:var(--r-raro);box-shadow:0 0 16px rgba(242,208,76,.45)}
 .dado.pifia{border-color:var(--sangre-b);color:var(--sangre-b);box-shadow:0 0 16px rgba(220,74,82,.45)}
 .tirada-total{font-family:var(--fn);font-weight:700;font-size:3rem;line-height:1.05;color:var(--hueso);margin-top:4px}
@@ -438,22 +439,23 @@ button.inv-nom{text-align:left;min-height:40px;font-size:var(--fs-lg)}
 .ref em{font-style:italic;font-size:var(--fs-xs);color:var(--muted)}
 .ref + .leyenda{margin-top:8px}
 
-/* ── Roll de los dados ──────────────────────────────────────── */
-.dado.rodando{animation:rodar .22s linear infinite;border-color:var(--rim2);color:var(--dim)}
-@keyframes rodar{
-  0%{transform:rotate(0deg) translateY(0) scale(1)}
-  25%{transform:rotate(95deg) translateY(-5px) scale(.94)}
-  50%{transform:rotate(180deg) translateY(0) scale(1)}
-  75%{transform:rotate(275deg) translateY(-3px) scale(.96)}
-  100%{transform:rotate(360deg) translateY(0) scale(1)}
-}
-.dado.asentado{animation:asentar .32s cubic-bezier(.25,1.6,.45,1)}
-@keyframes asentar{0%{transform:scale(1.4) rotate(-8deg)}60%{transform:scale(.95)}100%{transform:none}}
-.dado.asentado.descartado{animation:none}
+/* ── Roll de los dados ──────────────────────────────────────────
+   El dado no se mueve: el número rueda dentro, como un rodillo. */
+.dado{position:relative;overflow:hidden;transition:opacity .25s,transform .25s,border-color .2s,box-shadow .2s}
+.cara{position:absolute;inset:0;display:grid;place-items:center}
+.dado.rodando{border-color:var(--rim2)}
+.dado.rodando .cara{color:var(--dim)}
+.cara.entra{animation:entra linear both}
+.cara.sale{animation:sale linear both}
+.cara.asienta{animation:asienta cubic-bezier(.25,1.5,.45,1) both}
+@keyframes entra{from{transform:translateY(-85%);opacity:.2}to{transform:none;opacity:1}}
+@keyframes sale{from{transform:none;opacity:1}to{transform:translateY(85%);opacity:.2}}
+@keyframes asienta{0%{transform:translateY(-70%);opacity:.3}70%{transform:translateY(7%);opacity:1}100%{transform:none}}
 .tirada-res{opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .22s,transform .22s}
 .tirada-res.visible{opacity:1;transform:none;pointer-events:auto}
 .tirada-res.visible .tirada-total{animation:asentar .3s cubic-bezier(.25,1.6,.45,1)}
+@keyframes asentar{0%{transform:scale(1.35)}60%{transform:scale(.96)}100%{transform:none}}
 @media(prefers-reduced-motion:reduce){
-  .dado.rodando,.dado.asentado,.tirada-res.visible .tirada-total{animation:none}
+  .cara.entra,.cara.sale,.cara.asienta,.tirada-res.visible .tirada-total{animation:none}
   .tirada-res{transition:none}
 }

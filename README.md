@@ -9,8 +9,9 @@ Proyecto hermano de *S&S Companion*: mismo enfoque técnico, código propio.
 
 ## Qué incluye (niveles 1–10)
 
-Una ficha sencilla, pensada para mirarla y tocarla en la mesa. Tres
-pestañas:
+Una ficha sencilla, pensada para mirarla y tocarla en la mesa. Cuatro
+pestañas, que se cambian con la barra de abajo o **deslizando el dedo** a
+izquierda o derecha (cada una recuerda por dónde ibas):
 
 - **Ficha**:
   - portada con retrato (se toca para elegir una foto, que se recorta al
@@ -23,7 +24,8 @@ pestañas:
     Se tocan para tirar Combate, Daño, Bloquear (Combate cuerpo a cuerpo
     +2 con escudo) e Iniciativa; el clérigo tiene además Combate mágico.
     La Guardia (defensa pasiva, y desprevenido) y la Armadura se muestran
-    sin tirar;
+    sin tirar.
+- **Estadísticas**:
   - **Atributos**: arriba se tira la Prueba y abajo la Salvación (ya con la
     Competencia sumada);
   - **Habilidades**, plegada.
@@ -42,8 +44,10 @@ bloquear: crítico, bloqueas y contraatacas; pifia, daño máximo sin
 Armadura. El humano puede repetir una tirada por sesión;
 se recupera sola si han pasado más de 6 horas.
 
-**El roll**: al tirar, los dados giran cambiando de cara cada vez más despacio
-y se asientan uno tras otro, con vibración en el móvil. El total y los botones
+**El roll**: al tirar, el dado se queda quieto y es el número el que rueda
+dentro, como el rodillo de una tragaperras: cada cara entra por arriba y la
+anterior sale por abajo, cada vez más despacio. Los dados se asientan uno
+tras otro, con vibración en el móvil. El total y los botones
 aparecen cuando se detienen, así que el resultado no se adelanta. Con
 «reducir movimiento» se muestra directo.
 
